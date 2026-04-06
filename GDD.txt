@@ -10,7 +10,7 @@ Terrain hat effekt auf den Kampf, immersion: taktiken und adaptivität gefragt!
 Technologie: Python, Pygame, Tiled, eigene Assets
 
 USP:
-
+  
 • Narrative Tiefe mit schichtweiser Enthüllung
 
 • Loop-Mortalität (Wiedergeburt statt Tod)
