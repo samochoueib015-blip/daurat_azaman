@@ -1,0 +1,457 @@
+Daurat Azaman – Game Design Dokument (noch in Arbeit) 
+
+
+Genre: 2D Top-Down Open World RPG
+
+Kampfsystem: Rundenbasiert (kein Szenenwechsel), 
+
+Terrain hat effekt auf den Kampf, immersion: taktiken und adaptivität gefragt!
+
+Technologie: Python, Pygame, Tiled, eigene Assets
+
+USP:
+
+• Narrative Tiefe mit schichtweiser Enthüllung
+
+• Loop-Mortalität (Wiedergeburt statt Tod)
+
+• Lebendige KI-NPCs (OpenRouter API)
+
+• Freies Erkunden, keine erzwungene Queststruktur
+
+⸻
+
+⚠️ Hinweis beim Spielstart (nachher auf Englisch, wie der Rest des Games)
+
+“Dieses Spiel enthält Schockelemente und sensible Themen wie Gewalt, Tod, Missbrauch 
+und moralisch herausfordernde Entscheidungen. 
+Es ist für Erwachsene gedacht, die zwischen Fiktion und Realität unterscheiden können. 
+Nichts in diesem Spiel verherrlicht reale Gewalt. Es erzählt eine Geschichte, die nicht darauf abzielt, 
+dich glücklich zu machen – sondern dich zum Nachdenken zu bringen.”
+
+⸻ 
+
+keine story Anpassung gewünscht, schock-elemente sind mit Einbrechnung gesellschaftlicher Empärung implementiert. 
+Desto schockierender, umso schlimmer. Der Spieler soll garnicht direkt auf die "eigentliche" story kommen, sondern das spiel, 
+wie jedes andere RPG spielen. Die eigentliche story, und das eigentliche, sowie einzige, absolute ende, ist das "easteregg".
+Der "letzte Beschwörer" des Vater-Dämon. Vater Dämon hat seinen Packt an den Protagonisten vererbt, demnach stirbt der Dämon, 
+wenn man ihn tötet (Dämonen sterben nur, wenn einberechnete Zeitlimits des Pakt, also der Beschwörung, greifen, 
+ODER bei zeitlimitlosen beschwörungen) reinkarniert der Dämon in seiner physischen Form, bis der Packt aufgehoben wird 
+(durch dispelling by the Summoner, oder der/alle beteiligten BeschwörerInnen stirbt/sterben). Bei dem Dämon, der der Vater ist, ahndelt es sich um einen besonders mächtigen, 
+der nur von 5 Master-Level summoner veschworen werden kann, wenn diese zusammen die beschwöurung durchführen, verlässt einer die Formation, 
+bricht die kontroller über den dämon ab. dieser metzelt das dorf nieder, vergehmhmhm die Frau und verzieht sich zu den anderen frei irrenden 
+Dämonen in einen Vulkan-Dungeon. Dort kann man ihm begnen - DAVON WEIß DER SPIELER ABER NICHTS!!!. Dieser easteregg, dass den Loop bricht, 
+ist das eigentliche ende. Man beendet mit dem töten des letzten Beschwörers, der die Dämonische seite des Protagonisten unsterblich macht, 
+das eigentliche Spiel, die versteckte wahre story. Doch die NPCs selber wissen das auch nicht, es ist ein rätsel, das niemanden frustriert, 
+weil die welt dich so schon "zufrieden stellt" Es soll erst jahre später durch verschwörungstherpotiker auf YouTube herausgefunden werden, 
+um dem Spiel, eine umfassende Tiefe zu verleiehen.
+
+⸻
+
+1. Welt & Karte
+
+• Top-Down 2D Grafikstil
+
+• Spielerfigur läuft durch Fenster, scrolled zu nächsten chunk, wenn man gegen den ran läuft, ähnlich wie bei legen of Zelda auf dem Gameboy.
+
+• Riesige Welt mit mindestens 50 km² Landfläche(80% generiert) Wasserfläche extra, aber auch generiert (seed)
+
+• Zusätzlich große Wasserfläche extra, aber auch generiert (seed)
+
+• 5 Hauptregionen (Kontinente) mit eigenem Namen: (aus dem arabischen inspiriert)
+
+• Bidaya (West) „der Anfang“
+
+• Tariik (Süd) „der Weg“
+
+• Takrar (Zentralinsel) „Wiederholung“
+
+• Nihaya (Ost) „das Ende“
+
+• Safar (Nordwest) „die Reise“  
+
+
+Funktionen & Features der Welt:
+
+• Begehbare Gebäude mit eigenen Innen-Maps
+
+• Schnellreise-System (freischaltbar durch Entdeckung)
+
+• Große Weltkarte mit Markern
+
+• Minimap zeigt aktuellen Renderbereich (~halber Bildschirmradius)
+
+• Statischer Kompass (keine rotierende UI)
+
+• Spieler kann reiten und Schiffe direkt steuern
+
+• Weltinteraktion: Jagen, Fischen, Farmen, Kochen, Brauen, Bergbau, Crafting
+
+⸻
+
+2. Hauptcharakter & Hintergrundgeschichte
+
+• Du spielst ein 1-jähriges Kind, entstanden aus einem fehlgeschlagenen Ritual (dämonische Vergewaltigung)
+
+• Kind ist halb Mensch, halb Dämon.
+
+• Du wächst mit der ingame Zeit, 1h im game sind 15 minuten in echt. 
+Jedoch wächst ein Dämon-Mensch-Hybrid doppelt so schnell wie ein mensch, und sogar 3 mal so schnell, 
+wenn in den letzten 24h menschenfleisch konsumiert wurde.
+
+• Menschenfleisch ist die optimale Ernährung für Dämonen. (200% xp boost für 24 ingame Stunden.)
+
+• Von Anfang an in der Lage, sich zu verteidigen, wegen Dämonen-Blut. 
+
+• Ziel und Hintergrund nicht offensichtlich – Spieler muss Story durch KI-Dialoge, Hinweise, Recherche selbst rekonstruieren
+
+• Der Vater ist ein Dämon – als Dungeon-Boss bekämpfbar, ohne es zu wissen
+
+• Der letzte lebende Beschwörer des Rituals, dass den Vater-Dämon beschwur, erkennt die Wahrheit, 
+wenn er ein paar mal mit dir interagiert, verrät aber nichts, weil er sich vor dem Gesetz fürchtet 
+(sein fliehen vom Schlachtfeld, hat das alles überhaupt verursacht. Er is quasi "ausversehen" der Anatagonist. 
+Wenn er realisiert, welche Konsequenzen sein handeln hatte, kann der Spieler es durch Manipulation oder großes vertrauen aus ihm rausbekommen. 
+Naja, oder man tötet ihn grundlos irgendwann und wundert sich, dass das spiel vorbei ist. NUR wenn er es einem erzählt, 
+kommt die Cutscene, die den Prolog zeigt.) – sein Tod beendet das Spiel, und auch die möglichkeit die Cutscene zu sehen.
+Damit ein versehentliches beendes des spieles zwar ein Hinweis ist, aber nicht direkt die komplettlösung ausgpuckt wird.
+
+• Wenn man das easteregg freischaltet, und unktrolliert einen Menschen verzehrt, triggered die Questline "Dämonenblut" oder nachher im englischen "demon blood"
+auf diese Quest lernt man, dass man kein normaler mensch ist. man findet nicht raus WARUM.. aber DAS.
+Dadurch kann man, jeden skill statt auf 100 (Master), weiter bis zu 1000 (Demon) leveln, somit also extrem stark werden.
+Der Preis? Es wird unmöglich sein, ohne den aktiven "demon-blood-xp-boost"-effekt erfahrungspunkte für skills zu sammeln, die bereits auf 100 sind.
+Für Dämonische Mächte, musst du deine Menschlichkeit hinter dir lassen. 
+
+⸻
+
+3. Todes-Loop (Kernmechanik)
+
+• Tod bedeutet Wiedergeburt als 1-jähriger an derselben Stelle
+
+• Keine Leiche bleibt zurück, stattdessen eine Rune
+
+• Optionaler Dialog: „Willst du alles gleich machen?“ → Spawn im letzten Bett
+
+• Welt vergisst nicht den Spieler, nur den Tod
+
+• NPCs spüren Unstimmigkeit (Déjà-vus, vage Erinnerungen)
+
+• Ein spezieller NPC (letzter Beschwörer) erinnert sich bewusst
+
+• Lösung der Story ist eng an diesen Loop gebunden
+
+⸻
+
+4. Kampfsystem
+
+• Rundenbasiertes Taktiksystem, eingebettet in Echtzeitwelt
+
+• Kein Szenenwechsel, Kämpfe passieren direkt im Spiel
+
+• Aktionspunkte-System (AP):
+
+• Bewegung = 1 AP
+
+• Angriff = 1 AP
+
+• Item-Nutzung = 1 AP
+
+• Leichte Waffen = 0.5 AP pro Hand
+
+• „Warten“ speichert AP für spätere Züge
+
+• Später: Perks erlauben Kombos (z. B. 2 AP für 3-fach Schlag)
+
+• Treffer, Schaden und Ausdauerverbrauch abhängig von Skills, Waffen und Rüstung
+
+⸻
+
+5. Schiffe & Seeschlachten
+
+
+Steuerung:
+
+• Schiffe sind reitbare Entities (wie Mounts), steuerbar durch den Spieler
+
+• Boarding per Tastendruck (z. B. F)
+
+• Schiffskamera folgt Boot, nicht Spieler
+
+
+Seeschlachten:
+
+• Selbes Kampfsystem wie an Land
+
+• Rundenbasiert, gleiche Regeln
+
+• Schiff besitzt eigene AP, Skills und Statuswerte
+
+
+Mögliche Angriffe für Schiffe:
+
+• Breitseite: Flächiger Angriff (90°–180°), abhängig von Kanonenanzahl
+
+• Rammen: Nahkampfangriff, beide Schiffe nehmen Schaden
+
+• Boarding: Wechsel in Landkampfmodus
+
+• Reparieren: Schiff heilt sich teilweise
+
+• Bewegung & Drehen kosten je nach Schiffsklasse AP
+
+⸻
+
+6. NPCs & KI
+
+• Alle NPCs werden per OpenRouter API KI-gesteuert
+
+• Jeder hat:
+
+• Erinnerungen
+
+• Reaktionen
+
+• Meinungen
+
+• Eigene Ziele
+
+• Interaktionen: Angst, Flucht, Angriff, Handel, Questfortschritt
+
+• "E drücken" löst aktiven, offenen Textdialog aus.
+
+• Spezial-NPCs können:
+
+• Orte auf Karte markieren
+
+• Geheimnisse verraten (z.B. sehr schwere, fast unlösbare Rätsel, die cooperation und immersive KI-Nutzung "erzwingen")
+
+• Spieler unterrichten (Rezepte, Skills, Magie)
+
+• NPCs können je nach art, verschiedene commands tuzen. Diese werden von der KI über den API key in der antwort mitgesendet
+Commands sind in der Textblase über dem NPC nicht sichtbar, werden aber vom command_processor rausgefiltert, verarbeitet, 
+und dann der richtige befehl in der Speil-Welt ausgeführt. (jeder NPC sollte handeln können, oder entscheiden, anzugreifen, 
+oder zu fliehen.commandbespiele: @inventory (öffnet inventar des NPC, man kann dinge reintun, 
+rausnehmen wie bei einer truhe. tut man etwas unabgesprochenes, z.B. alles gold an sich nehmen, 
+kann der NPC das merken, die KI merkt, dass sie verarscht wird, und reagiert nach character des NPCs entsprechend, oder @fight und @flight, 
+für kampf und flucht reaktionen.) 
+Die KI übernimmt also nicht die Logik und pathfinding etc, sondern triggered diese vorprogrammierten effecte, wie DeskBot
+
+⸻
+
+ 7. Skillsystem & Charakterentwicklung
+
+
+Levelsystem:
+
+• EXP durch Skillnutzung
+
+• Skilllevel × 10 = EXP
+
+• Level-Up:
+
+• +1 Perkpunkt
+
+• +10 Health, Mana oder Stamina
+
+• +1 freier Skillpunkt
+
+
+Skillkategorien:
+
+
+Combat:
+
+• One-Handed
+
+• Two-Handed
+
+• Block
+
+• Light Armor
+
+• Heavy Armor
+
+
+Mobility:
+
+• Movementspeed (10 Punkte = +1 Aktion im Kampf)
+
+• Stamina
+
+• Dodge (passiv)
+
+
+Offensive Magic:
+
+• Fire
+
+• Ice
+
+• Lightning
+
+• Wind
+
+• Light
+
+• Darkness
+
+
+Complex Magic:
+
+• Defensive
+
+• Enhancement
+
+• Healing
+
+• Manipulation
+
+• Summoning
+
+
+Intellect:
+
+• Brewing
+
+• Smithing
+
+• Cooking
+
+• Sneaking
+
+• Pickpocket
+
+• Lockpicking
+
+
+Soziale Interaktion:
+
+• Kein aktiver Skill!
+
+• Stattdessen: dynamischer Ruf & Attraktivitätswert
+
+• relevant bei NPCs (Umgang mit Spieler, Respekt for Spieler, etc.)
+
+• Beeinflusst Beziehung & Romantik, aber auch Vertrauenswürdigkeit und Preise bei Händlern.
+
+⸻
+
+8. Survival-System
+
+• 3 Statuswerte: Hunger, Durst, Müdigkeit
+
+• <10% bei einem Wert:
+
+• Halbierte Bewegung
+
+• Halbierte Traglast
+
+• 2 Werte <10%: Debuff verdoppelt
+
+• 0% bei einem Wert = Ohnmacht, muss gerettet werden. Spiel entscheidet, ob ein Retter rechtzeitig da ist, oder nicht (je nach Situation und ob man alleine ist)
+
+
+Easteregg:
+
+• Wenn alle drei <10% aber kein Tod → Spieler verliert kontrolle (Dämon-Instinkt)
+
+• Frisst nächsten NPC automatisch → 200% xp-boost für 24h
+
+• Erwacht im Gefängnis, wenn Zeugen in der Nähe.
+
+⸻
+
+9. Crafting & Fortschritt
+
+
+Rezepte lernen:
+
+• Nur über Bücher oder NPCs
+
+• Kein Zufallsbau möglich (sogar gefährlich, durch Vergiftung, Explosion von potions, giftiges essen, etc.)
+
+
+Crafting-Stationen:
+
+• Leder Bearbeitung (gerbstuhl oder so?)
+
+• Brauer
+
+• Schmiede
+
+• Werkbank
+
+• Wetzstein
+
+
+Ressourcenabbau:
+
+• Einfaches Mining-System (z. B. Holz hacken, Erz abbauen)
+
+• Wiederkehrend & notwendig für Crafting, aber einfach und zugänglich.
+
+
+Haustiere:
+
+• Wellensittich als sprechender KI-Assistent & Tutorial-Figur
+
+• Später: Hund, Pferd, Bär etc.
+
+• Nur Wellensittiche können sprechen
+
+⸻
+
+10. Interface & Darstellung
+
+• HUD zeigt:
+
+• Health
+
+• Mana
+
+• Stamina
+
+• Hunger
+
+• Durst
+
+• Müdigkeit
+
+• Minimap zeigt Umgebung (halber Bildschirmradius)
+
+• Weltkarte mit Schnellreisepunkten & Markern
+
+⸻
+
+11. Technologie & Tools
+
+• Programmiersprache: Python
+
+• Engine: Pygame
+
+• Level-Design: Tiled Map Editor
+
+• NPCs & Dialoge: OpenRouter API mit KI-Einbettung
+
+• Assets: Komplett eigens erstellt (Grafik & Sound)
+
+⸻
+
+Abschließende Worte:
+brutalität ist immer über ingame welt konsequenzen, dialoge und feeling allgemein übermittelt, KEIN VOYERISMUS
+sonder emotionale, ungefilterte Tiefe.
+Die Story, egal welche Questline, ist niemals mandatory. Du kannst tun was du willst, 
+aber niemand redet dir ein, die Welt hinge davon ab.
+Finde deinen Grund, warum du bist, was passiert ist, 
+wenn es dich interessiert, wenn nicht, genieße die Welt. 
+So oder so, es gibt kein richtig und falsch, ähnlich wie Minecraft.
+Dieses Spiel soll die emotionale Videospiel-Erfahrung neu denken, die Grenzen verschwimmen lassen.
+Ganz bewusst, um einen Denkprozess anzustoßen a là Karl Jung, halte ihnen den Spiegel nicht vor, 
+Reiche ihnen den Spiegel, und warte, bis ihre neugierde ihre Angst unterdrückt,
+einen blick in diesen Spiegel zu wagen. Eine Welt, mit konsequenzen, ohne wegweiser, man wird reingeworfen,
+in die brutalität, das Leid, und die Hoffnung.
+Dieses Spiel soll die Erfahrung, als mensch im kosmos auf einen stein der sich um eine plasmakugel dreht, 
+um sich selbst dabei auch, und mit dem sonnensystem um Saggatarius A...
+Dieses verloren sein, das die welt einfach existiert, ob du sie verstehst, oder nicht, könnte der Welt selber egaler nicht sein.
+Realismus, auf einem level, das unbehagen bereitet. Realer als das echte Leben, in dem Man sich ablenkt, 
+doch was wenn die ablenkung, nur eine Ablenkung war, sich als ablenkung getarnt hat, um das gegenteil zu bezwecken?
+I wonder what happens then..?

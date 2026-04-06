@@ -1,0 +1,287 @@
+```
+daurat_azaman/                                  # PROJECT ROOT
+├── av/                                         # directory for audio & visual assets
+│   ├── music/                                  # directory for music
+│   ├── sounds/                                 # dircetory for sounds
+│   └── sprites/                                # directory for sprites
+│       ├── cities/                             # directory for cities sprites
+│       ├── items/                              # directory for items sprites
+│       │   ├── furniture/                      # directory for furniture sprites
+│       │   │   ├── chest_closed.png            # sprite for closed chests
+│       │   │   └── chest_open.png              # sprite for opened chests
+│       │   └── weapons/                        # directory for weapon sprites
+│       │       └── iron_sword.png              # sprite for iron sword
+│       ├── npc/                                # directory for NPC sprites
+│       └── player/                             # directory for player_sprites
+│           ├── player_idle_8dir_sheet.png      # sprite for player idle (2rows, 4 colums)
+│           └── player_swalk_8dir_sheet.png     # sprite for player south walk animation (2rows, 4colums)
+├── engine/                                     # directory for custom game-engine
+│   ├── ai/                                     # directory for AI- handling
+│   │   ├── __init__.py                         # empty, but existent
+│   │   ├── api_handler.py                      # empty, but existent (placeholder)
+│   │   └── command_processor.py                # empty, but existent (placeholder)
+│   ├── battle/                                 # directory for battle-system
+│   │   ├── __init__.py                         # empty, but existent
+│   │   ├── battle_hud.py                       # empty, but existent (placeholder)
+│   │   └── battle_system.py                    # empty, but existent (placeholder)
+│   ├── crafting/                               # directory for crafting-system
+│   │   ├── __init__.py                         # empty, but existent
+│   │   ├── brewer.py                           # empty, but existent (placeholder)
+│   │   ├── cooking.py                          # empty, but existent (placeholder)
+│   │   ├── smithing.py                         # empty, but existent (placeholder)
+│   │   ├── tanning_rack.py                     # empty, but existent (placeholder)
+│   │   └── workbench.py                        # empty, but existent (placeholder)
+│   ├── items/                                  # directory for items
+│   │   ├── clothing/                           # directory for clothing-items
+│   │   │   ├── chest/                          # directory for chest-clothing
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── tunica.py                   # empty, but existent (placeholder)
+│   │   │   ├── feet/                           # directory for feet-clothing
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── foot_wraps.py               # empty, but existent (placeholder)
+│   │   │   ├── hands/                          # directory for hand-clothing
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── leather_gloves.py           # empty, but existent (placeholder)
+│   │   │   ├── head/                           # directory for head-clothing
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── old_hat.py                  # empty, but existent (placeholder)
+│   │   │   ├── legs/                           # directory for leg-clothing
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── cloth_wraps.py              # empty, but existent (placeholder)
+│   │   │   └── __init__.py                     # empty, but existent
+│   │   ├── consumeables/                       # directory for consumeables
+│   │   │   ├── drinkable/                      # directory for drinkable consumeables
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── mead.py                     # empty, but existent (placeholder)
+│   │   │   ├── eatable/                        # directory for eatable consumeables
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── apple.py                    # empty, but existent (placeholder)
+│   │   │   └── __init__.py                     # empty, but existent
+│   │   ├── heavyarmor/                         # directory for heavy armor
+│   │   │   ├── chest/                          # directory for heavy cheastarmor
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── iron_chestplate.py          # empty, but existent (placeholder)
+│   │   │   ├── feet/                           # directory for heavy feetarmor
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── iron_boots.py               # empty, but existent (placeholder)
+│   │   │   ├── hands/                          # directory for heavy handarmor
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── iron_gauntlets.py           # empty, but existent (placeholder)
+│   │   │   ├── head/                           # directory for heavy headarmor
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── iron_helmet.py              # empty, but existent (placeholder)
+│   │   │   ├── legs/                           # directory for heavy legarmor
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── iron_knee_cops.py           # empty, but existent (placeholder)
+│   │   │   └── __init__.py                     # empty, but existent
+│   │   ├── ingredients/                        # directory for ingredients (potions)
+│   │   │   ├── __init__.py                     # empty, but existent
+│   │   │   ├── daya_leaf.py                    # empty, but existent (placeholder)
+│   │   │   └── twirling_mushroom.py            # empty, but existent (placeholder)
+│   │   ├── lightarmor/                         # directory for light armor
+│   │   │   ├── chest/                          # directory for light chestarmor
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── leather_chest_armor.py      # empty, but existent (placeholder)
+│   │   │   ├── feet/                           # directory for light feetarmor
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── leather_boots.py            # empty, but existent (placeholder)
+│   │   │   ├── hands/                          # directory for light handarmor
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── leather_armguards.player    # empty, but existent (placeholder)
+│   │   │   ├── head/                           # directory for light headarmor
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── fur_helmet.py               # empty, but existent (placeholder)
+│   │   │   ├── legs/                           # directory for light legarmor
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── fur_pants.py                # empty, but existent (placeholder)
+│   │   │   └── __init__.py                     # empty, but existent
+│   │   ├── potions/                            # directory for potions
+│   │   │   ├── enhance/                        # directory for enhancing potions
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── small_atk_boost.py          # empty, but existent (placeholder)
+│   │   │   ├── restoration/                    # directory for restoration potions
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── small_healing_potion.py     # empty, but existent (placeholder)
+│   │   │   └── __init__.py                     # empty, but existent
+│   │   ├── ressources/                         # directory for crafting ressources
+│   │   │   ├── __init__.py                     # empty, but existent
+│   │   │   ├── animal_hide.py                  # empty, but existent (placeholder)
+│   │   │   ├── gold.py                         # empty, but existent (placeholder)
+│   │   │   ├── iron.py                         # empty, but existent (placeholder)
+│   │   │   ├── leather.py                      # empty, but existent (placeholder)
+│   │   │   ├── magmite.player                  # empty, but existent (placeholder)
+│   │   │   ├── silver.py                       # empty, but existent (placeholder)
+│   │   │   ├── steel.py                        # empty, but existent (placeholder)
+│   │   │   └── wood.py                         # empty, but existent (placeholder)
+│   │   ├── weapons/                            # directory for weapons
+│   │   │   ├── bows/                           # directory for bows
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── longbow.py                  # empty, but existent (placeholder)
+│   │   │   ├── crossbows/                      # directory for crossbows
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── iron_crossbow.py            # empty, but existent (placeholder)
+│   │   │   ├── greatswords/                    # directory for greatswords
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── iron_greatsword.py          # empty, but existent (placeholder)
+│   │   │   ├── swords/                         # directory for swords
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── iron_sword.py               # 
+│   │   │   └── __init__.py                     # empty, but existent
+│   │   ├── __init__.py                         # empty, but existent
+│   │   ├── base_item.py                        # 
+│   │   └── item_registry.py                    # 
+│   ├── npc/                                    # directory for NPCs
+│   │   ├── npc_equipment/                      # directory for NPC equipment
+│   │   │   ├── npc_equipments/                 # directory for NPC eqipment saves
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── npc_equipment_1.json        # empty, but existent (placeholder)
+│   │   │   ├── __init__.py                     # empty, but existent
+│   │   │   └── npc_equipment.py                # empty, but existent (placeholder)
+│   │   ├── npc_inventory/                      # directory for NPC inventory
+│   │   │   ├── npc_inventories/                # directory for NPC inventory saves
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── npc_inventory_1.json        # empty, but existent (placeholder)
+│   │   │   ├── __init__.py                     # empty, but existent
+│   │   │   └── npc_inventory.py                # empty, but existent (placeholder)
+│   │   ├── npc_memory/                         # directory for NPC memory
+│   │   │   ├── npc_memories/                   # directory for NPC memory saves
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── npc_memory_1.json           # empty, but existent (placeholder)
+│   │   │   ├── __init__.py                     # empty, but existent
+│   │   │   └── npc_memory.py                   # empty, but existent (placeholder)
+│   │   ├── __init__.py                         # empty, but existent
+│   │   ├── npc_manager.py                      # 
+│   │   ├── npc_prompt.py                       # empty, but existent (placeholder)
+│   │   ├── npc_race.py                         # 
+│   │   └── npc.py                              # 
+│   ├── player/                                 # directory for player
+│   │   ├── equiped/                            # directory for player equipment
+│   │   │   ├── __init__.py                     # empty, but existent
+│   │   │   ├── armor.py                        # empty, but existent (placeholder)
+│   │   │   ├── spell.py                        # empty, but existent (placeholder)
+│   │   │   └── weapons.py                      # empty, but existent (placeholder)
+│   │   ├── inventory/                          # directory for inventory
+│   │   │   ├── __init__.py                     # empty, but existent
+│   │   │   ├── inventory_content.json          # 
+│   │   │   └── player_inventory.py             # 
+│   │   ├── skill/                              # directory for skills
+│   │   │   ├── skill_trees/                    # directory for skill trees
+│   │   │   │   ├── combat/                     # directory for combat skills
+│   │   │   │   │   ├── __init__.py             # empty, but existent
+│   │   │   │   │   ├── block.py                # empty, but existent (placeholder)
+│   │   │   │   │   ├── heavy_armor.py          # empty, but existent (placeholder)
+│   │   │   │   │   ├── light_armor.py          # empty, but existent (placeholder)
+│   │   │   │   │   ├── one_handed.py           # empty, but existent (placeholder)
+│   │   │   │   │   └── two_handed.py           # empty, but existent (placeholder)
+│   │   │   │   ├── complex_magic/              # directory for complex magic skills
+│   │   │   │   │   ├── __init__.py             # empty, but existent
+│   │   │   │   │   ├── defensive.py            # empty, but existent (placeholder)
+│   │   │   │   │   ├── enhancement.py          # empty, but existent (placeholder)
+│   │   │   │   │   ├── healing.py              # empty, but existent (placeholder)
+│   │   │   │   │   ├── manipulation.py         # empty, but existent (placeholder)
+│   │   │   │   │   └── summoning.py            #  empty, but existent (placeholder)
+│   │   │   │   ├── mobility/                   # directory for mobility skills
+│   │   │   │   │   ├── __init__.py             # empty, but existent
+│   │   │   │   │   ├── dodge.py                # empty, but existent (placeholder)
+│   │   │   │   │   ├── movement_speed.py       # empty, but existent (placeholder)
+│   │   │   │   │   └── stamina.py              # empty, but existent (placeholder)
+│   │   │   │   ├── offensive_magic/            # directory for offensive magic skills
+│   │   │   │   │   ├── __init__.py             # empty, but existent
+│   │   │   │   │   ├── darkness.py             # empty, but existent (placeholder)
+│   │   │   │   │   ├── fire.py                 # empty, but existent (placeholder)
+│   │   │   │   │   ├── ice.py                  # empty, but existent (placeholder)
+│   │   │   │   │   ├── light.py                # empty, but existent (placeholder)
+│   │   │   │   │   ├── thunder.py              # empty, but existent (placeholder)
+│   │   │   │   │   └── wind.player             # empty, but existent (placeholder)
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── skill_tree.py               # empty, but existent (placeholder)
+│   │   │   ├── __init__.py                     # empty, but existent
+│   │   │   ├── level_skill_manager.py          # empty, but existent (placeholder)
+│   │   │   ├── player_level.py                 # empty, but existent (placeholder)
+│   │   │   └── player_skill_level.py           # empty, but existent (placeholder)
+│   │   ├── stats/                              # directory for stats
+│   │   │   ├── __init__.py                     # empty, but existent
+│   │   │   ├── general.py                      # empty, but existent (placeholder)
+│   │   │   └── survival.py                     # empty, but existent (placeholder)
+│   │   ├── __init__.py                         # empty, but existent
+│   │   └── player.py                           # 
+│   ├── world/                                  # directory for world
+│   │   ├── cities/                             # directory for cities
+│   │   │   └── barn.py                         # empty, but existent (placeholder)
+│   │   ├── indoor/                             # directory for indoor
+│   │   │   ├── __init__.py                     # empty, but existent
+│   │   │   ├── furniture.py                    # empty, but existent (placeholder)
+│   │   │   └── map_loader.py                   # empty, but existent (placeholder)
+│   │   ├── objects/                            # directory for objects
+│   │   │   ├── inventory/                      # directory for object inventories
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   └── chest_inventory.py          # 
+│   │   │   ├── __init__.py                     # empty, but existent
+│   │   │   ├── chest_manager.py                # 
+│   │   │   └── chest.py                        # 
+│   │   ├── outdoor/                            # directory for outdoor
+│   │   │   ├── biomes/                         # directory for biomes
+│   │   │   │   ├── __init__.py                 # empty, but existent
+│   │   │   │   ├── coast.py                    # 
+│   │   │   │   ├── desert.py                   # 
+│   │   │   │   ├── fields.py                   # 
+│   │   │   │   ├── forest.py                   # 
+│   │   │   │   ├── mountain.py                 # 
+│   │   │   │   ├── ocean.py                    # 
+│   │   │   │   ├── river.py                    # 
+│   │   │   │   ├── road.py                     # 
+│   │   │   │   └── snow.py                     # 
+│   │   │   ├── __init__.py                     # empty, but existent
+│   │   │   ├── weather.py                      # empty, but existent (placeholder)
+│   │   │   └── world_generator.py              #  
+│   │   ├── world_logic/                        # directory for world logic
+│   │   │   ├── __init__.py                     # empty, but existent
+│   │   │   ├── chunkloader.py                  # 
+│   │   │   └── world_time.py                   # empty, but existent (placeholder)
+│   │   ├── __init__.py                         # empty, but existent
+│   │   ├── chunk.py                            # 
+│   │   ├── map.png                             # for UI implementation
+│   │   ├── pixel_map_reader.py                 # 
+│   │   ├── pixel_map.png                       # for "pixel_map_reader.py"
+│   │   └── tile.py                             # 
+│   ├── __init__.py                             # - | - | - | -
+│   ├── camera.py                               # 
+│   ├── display.py                              # 
+│   └── engine.py                               # empty, but existent (placeholder)
+├── ui/                                         # directory for ui
+│   ├── popup/                                  # directory for popups
+│   │   ├── __init__.py                         # - | - | - | -
+│   │   ├── chest_view.py                       # 
+│   │   ├── inventory_view.py                   # 
+│   │   ├── journal_view.py                     # empty, but existent (placeholder)
+│   │   ├── map_view.py                         # empty, but existent (placeholder)
+│   │   └── settings_view.py                    # empty, but existent (placeholder)
+│   ├── widgets/                                # directory for HUD-widgets
+│   │   ├── __init__.py                         # empty, but existent
+│   │   ├── hud_buttons.py                      # empty, but existent (placeholder)
+│   │   ├── minimap.py                          # empty, but existent (placeholder)
+│   │   └── stat_bars.py                        # empty, but existent (placeholder)
+│   ├── __init__.py                             # empty, but existent
+│   └── hud.py                                  # empty, but existent (placeholder)
+├── user_data/                                  # directory for user data
+│   ├── chests/                                 # directory for chest savedata
+│   │   ├── chests_metadata.json                # 
+│   │   ├── wooden_chest_001_inventory.json     # 
+│   │   └── wooden_chest_002_inventory.json     # 
+│   ├── player/                                 # directory for player savedata
+│   │   ├── inventory_content.json              # 
+│   │   └── player_inventory.py                 # 
+│   ├── __init__.py                             # empty, but existent
+│   ├── config.json                             # 
+│   ├── errors.log                              # 
+│   └── reputation.json                         # 
+├── utils/                                      # directory for
+│   ├── __init__.py                             # empty, but existent
+│   ├── dialogs.py                              # empty, but existent (placeholder)
+│   ├── direction.py                            # 
+│   ├── logger.py                               # empty, but existent (placeholder)
+│   ├── save_game.py                            # empty, but existent (placeholder)
+│   └── user_input.py                           # 
+├── game_config.py                              # 
+└── main.py                                     # 
+```

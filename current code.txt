@@ -1,0 +1,3326 @@
+main.py
+```
+import pygame
+import sys
+from engine.player.inventory.player_inventory import PlayerInventory
+from engine.display import Display
+from engine.player.player import Player
+from utils.user_input import UserInputManager
+from engine.world.world_logic.chunkloader import ChunkLoader
+from engine.camera import Camera
+from pygame import Surface
+import math 
+from engine.npc.npc_manager import NPCManager
+from engine.world.objects.chest_manager import ChestManager
+from ui.popup.inventory_view import InventoryView 
+from ui.popup.chest_view import ChestView 
+
+pygame.init()
+
+game_display = Display() 
+
+assert game_display.screen is not None, "game_display.screen somehow not initialized to a Surface"
+screen: Surface = game_display.screen 
+
+SPAWN_X_METERS = 1300
+SPAWN_Y_METERS = 3300
+
+player_initial_pixel_x = int(SPAWN_X_METERS * Display.PIXELS_PER_METER)
+player_initial_pixel_y = int(SPAWN_Y_METERS * Display.PIXELS_PER_METER)
+
+player = Player(
+    x=player_initial_pixel_x, 
+    y=player_initial_pixel_y
+)
+
+input_manager = UserInputManager()
+
+chunk_loader = ChunkLoader()
+
+camera = Camera(player)
+
+npc_manager = NPCManager()
+chest_manager = ChestManager()
+
+inventory_view = InventoryView(screen, player.inventory, player)
+chest_view = ChestView(screen, player.inventory, player)
+
+FPS = 60
+clock = pygame.time.Clock()
+
+running = True
+while running:
+
+    dt = clock.tick(FPS) / 1000.0
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_i:
+
+            if chest_view.is_open:
+                chest_view.close()
+            inventory_view.toggle_visibility()
+            if inventory_view.is_open:
+                input_manager.clear_movement_keys()
+        
+        if inventory_view.is_open:
+            inventory_view.handle_event(event)
+        elif chest_view.is_open:
+            chest_view.handle_event(event)
+        else:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+                mouse_x, mouse_y = event.pos
+
+                camera_offset_x, camera_offset_y = camera.get_offset()
+                target_pixel_world_x = mouse_x + camera_offset_x
+                target_pixel_world_y = mouse_y + camera_offset_y
+
+                interacted_chest = chest_manager.interact_with_chests(target_pixel_world_x, target_pixel_world_y, player) 
+                if interacted_chest:
+                    chest_view.open(interacted_chest)
+                    input_manager.clear_movement_keys()
+                else:
+                    target_tile_pixel_x = (target_pixel_world_x // Display.TILE_SIZE_PIXELS) * Display.TILE_SIZE_PIXELS
+                    target_tile_pixel_y = (target_pixel_world_y // Display.TILE_SIZE_PIXELS) * Display.TILE_SIZE_PIXELS
+                    
+                    player.set_target(target_tile_pixel_x, target_tile_pixel_y) 
+                    input_manager.clear_movement_keys()
+
+            input_manager.handle_event(event)
+
+    static_colliders_for_player = [
+        chest.get_collision_rect() for chest in chest_manager.chests.values()
+    ]
+
+    dx, dy = 0, 0
+    if not inventory_view.is_open and not chest_view.is_open: 
+        dx, dy = input_manager.get_movement_vector()
+
+    player.move(dx, dy, dt, static_colliders=static_colliders_for_player)
+    player.update(dt)
+
+    camera.update()
+    
+    camera_offset_x, camera_offset_y = camera.get_offset()
+
+    chunk_loader.update(player.world_x, player.world_y)
+    
+    npc_manager.update(dt)
+    chest_manager.update(dt) 
+
+    screen.fill((0, 0, 0)) 
+
+    for chunk in chunk_loader.get_chunks_to_draw():
+        chunk.draw(screen, camera_offset_x, camera_offset_y)
+
+    player.draw(screen, camera_offset_x, camera_offset_y) 
+    
+    npc_manager.draw(screen, camera_offset_x, camera_offset_y)
+    chest_manager.draw(screen, camera_offset_x, camera_offset_y) 
+
+    if player.target_x is not None and player.target_y is not None:
+        target_screen_x = player.target_x - camera_offset_x
+        target_screen_y = player.target_y - camera_offset_y
+        
+        game_display.draw_rect_outline(
+            screen, 
+            (255, 0, 0),
+            target_screen_x, 
+            target_screen_y, 
+            Display.TILE_SIZE_PIXELS, 
+            Display.TILE_SIZE_PIXELS, 
+            outline_thickness=2 
+        )
+
+    world_x_m, world_y_m, pixel_x_on_map, pixel_y_on_map = \
+        chunk_loader.get_player_coordinates_for_map_debug()
+
+    debug_text_world = f"World (m): X={world_x_m:.2f}, Y={world_y_m:.2f}"
+    debug_text_map = f"Map (px): X={pixel_x_on_map:.2f}, Y={pixel_y_on_map:.2f}"
+    debug_chunk_coords = f"Chunk: ({chunk_loader.current_player_chunk_x}, {chunk_loader.current_player_chunk_y})"
+    debug_player_pixel = f"Player (px): X={player.world_x:.0f}, Y={player.world_y:.0f}"
+    debug_target_pixel = f"Target (px): {'N/A' if player.target_x is None else f'X={player.target_x:.0f}, Y={player.target_y:.0f}'}"
+    
+    game_display.draw_text(debug_text_world, 10, 10, (255, 255, 0))
+    game_display.draw_text(debug_text_map, 10, 40, (255, 255, 0))
+    game_display.draw_text(debug_chunk_coords, 10, 70, (255, 255, 0))
+    game_display.draw_text(debug_player_pixel, 10, 100, (255, 255, 0))
+    game_display.draw_text(debug_target_pixel, 10, 130, (255, 255, 0))
+
+    inventory_view.draw()
+    chest_view.draw() 
+
+    pygame.display.flip()
+
+player.inventory.save_inventory()
+chest_manager.save_chests() 
+
+pygame.quit()
+sys.exit()
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+game_config.py
+```
+import os
+
+PLAYER_SPRITE_SHEET_PATH = os.path.join("av", "sprites", "player", "player_idle_8dir_sheet.png")
+PLAYER_SWALK_SHEET_PATH = os.path.join("av", "sprites", "player", "player_swalk_8dir_sheet.png")
+
+NPC_HUMAN_IDLE_SHEET_PATH = os.path.join("av", "sprites", "npc", "human", "human1_idle_8dir_sheet.png")
+NPC_ELF_IDLE_SHEET_PATH = os.path.join("av", "sprites", "npc", "elf", "elf1_idle_8dir_sheet.png")
+
+CHEST_SPRITE_CLOSED_PATH = os.path.join("av", "sprites", "items", "furniture", "chest_closed.png")
+CHEST_SPRITE_OPEN_PATH = os.path.join("av", "sprites", "items", "furniture", "chest_open.png")
+
+
+PLAYER_SPRITE_DIRECTIONS_ORDER = [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+]
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+user_input.py
+```
+import pygame
+
+class UserInputManager:
+    """
+    Manages user input events and provides the current state of relevant controls.
+    """
+    def __init__(self):
+
+        self._keys_pressed = {
+            pygame.K_a: False,
+            pygame.K_d: False,
+            pygame.K_w: False,
+            pygame.K_s: False,
+        }
+        self._mouse_buttons_pressed = {
+            1: False,
+            2: False,
+            3: False,
+            4: False,
+            5: False,
+        }
+
+    def handle_event(self, event):
+        """
+        Processes a single Pygame event to update the state of keys.
+        This method should be called for every event in the Pygame event queue.
+        """
+
+        if event.type == pygame.KEYDOWN:
+
+            if event.key in self._keys_pressed:
+                self._keys_pressed[event.key] = True
+
+        elif event.type == pygame.KEYUP:
+
+            if event.key in self._keys_pressed:
+                self._keys_pressed[event.key] = False
+        
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button in self._mouse_buttons_pressed:
+                self._mouse_buttons_pressed[event.button] = True
+        elif event.type == pygame.MOUSEBUTTONUP:
+            if event.button in self._mouse_buttons_pressed:
+                self._mouse_buttons_pressed[event.button] = False
+
+
+    def get_movement_vector(self):
+        """
+        Calculates and returns the normalized movement vector (dx, dy)
+        based on the currently pressed directional keys.
+        """
+        dx, dy = 0, 0
+        if self._keys_pressed[pygame.K_a]:
+            dx -= 1
+        if self._keys_pressed[pygame.K_d]:
+            dx += 1
+        if self._keys_pressed[pygame.K_w]:
+            dy -= 1
+        if self._keys_pressed[pygame.K_s]:
+            dy += 1
+        return dx, dy
+
+    def clear_movement_keys(self):
+        for key in self._keys_pressed:
+            self._keys_pressed[key] = False
+
+    def is_mouse_button_down(self, button: int) -> bool:
+        """
+        Returns True if the specified mouse button is currently pressed down.
+        """
+        return self._mouse_buttons_pressed.get(button, False)
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+direction.py
+```
+VECTOR_TO_DIRECTION = {
+    (0, -1): "N",
+    (1, -1): "NE",
+    (1, 0):  "E",
+    (1, 1):  "SE",
+    (0, 1):  "S",
+    (-1, 1): "SW",
+    (-1, 0): "W",
+    (-1, -1):"NW",
+    (0, 0):  None
+}
+
+def get_direction_from_vector(dx, dy, current_direction_key):
+    """
+    Determines the direction string from a movement vector (dx, dy).
+
+    Args:
+        dx (int): Change in x-coordinate (-1, 0, or 1).
+        dy (int): Change in y-coordinate (-1, 0, or 1).
+        current_direction_key (str): The player's current/last known direction.
+                                     Used if there's no movement (dx=0, dy=0)
+                                     or if the vector is not recognized.
+
+    Returns:
+        str: The determined direction string (e.g., "N", "SE", "W").
+    """
+    if (dx, dy) == (0, 0):
+        return current_direction_key
+    
+    direction = VECTOR_TO_DIRECTION.get((dx, dy))
+    
+    if direction:
+        return direction
+    else:
+
+        print(f"Warning: Unrecognized movement vector ({dx}, {dy}) given to get_direction_from_vector. "
+              f"Maintaining current direction '{current_direction_key}'.")
+        return current_direction_key
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+inventory_view.py
+```
+import pygame
+from engine.player.inventory.player_inventory import PlayerInventory
+from engine.player.player import Player 
+from engine.items.base_item import BaseItem
+from engine.items.weapons.swords.iron_sword import IronSword
+from typing import List, Optional, Tuple
+
+class InventoryView:
+    """
+    Displays the player's inventory as a pop-up window,
+    following a specific layout with item selection and details.
+    """
+    def __init__(self, screen: pygame.Surface, player_inventory: PlayerInventory, player: Player):
+        self.screen = screen
+        self.player_inventory = player_inventory
+        self.player: Player = player
+        self.is_open = False
+
+        self.width = 800
+        self.height = 500
+        self.x = (self.screen.get_width() - self.width) // 2
+        self.y = (self.screen.get_height() - self.height) // 2
+        self.rect = pygame.Rect(self.x, self.y, self.width, self.height)
+
+        self.background_color = (30, 30, 30, 200)
+        self.border_color = (100, 100, 100)
+        self.text_color = (255, 255, 255)
+        self.highlight_color = (50, 150, 255)
+        self.font = pygame.font.Font(None, 24)
+        self.small_font = pygame.font.Font(None, 18)
+
+        self.player_sprite_area_rel = pygame.Rect(10, 10, 150, self.height - 20)
+
+        self.item_list_area_rel = pygame.Rect(self.player_sprite_area_rel.right + 10, 10, 250, self.height - 20)
+
+        right_panel_x = self.item_list_area_rel.right + 10
+        right_panel_width = self.width - right_panel_x - 10
+
+        self.item_name_header_rel = pygame.Rect(right_panel_x, 10, right_panel_width, 30)
+        self.item_value_header_rel = pygame.Rect(right_panel_x, self.item_name_header_rel.bottom + 5, right_panel_width, 30)
+
+        self.selected_item_sprite_area_rel = pygame.Rect(right_panel_x, self.item_value_header_rel.bottom + 10, right_panel_width, 150)
+        self.description_stats_area_rel = pygame.Rect(right_panel_x, self.selected_item_sprite_area_rel.bottom + 10, right_panel_width, self.height - self.selected_item_sprite_area_rel.bottom - 20)
+        self.item_list_start_y_offset = 30
+        self.item_list_line_height = self.font.get_height() + 5
+        self.max_visible_items = (self.item_list_area_rel.height - self.item_list_start_y_offset) // self.item_list_line_height
+
+        self.selected_item_index: Optional[int] = None
+        self.selected_item: Optional[BaseItem] = None
+
+    def toggle_visibility(self):
+        """Toggles the inventory window open or closed."""
+        self.is_open = not self.is_open
+        print(f"Inventory is now {'open' if self.is_open else 'closed'}.")
+        if self.is_open:
+            print(self.player_inventory)
+            self.selected_item_index = None
+            self.selected_item = None
+            if self.player_inventory.get_items():
+                self.selected_item_index = 0
+                self.selected_item = self.player_inventory.get_items()[0]
+
+
+    def draw(self):
+        """Draws the inventory window and its contents."""
+        if not self.is_open:
+            return
+
+        main_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        main_surface.fill(self.background_color)
+        pygame.draw.rect(main_surface, self.border_color, main_surface.get_rect(), 2) # Border
+        self.screen.blit(main_surface, (self.x, self.y))
+
+        player_sprite_abs_rect = self.get_abs_rect(self.player_sprite_area_rel)
+        pygame.draw.rect(self.screen, self.border_color, player_sprite_abs_rect, 1)
+
+        player_text = self.font.render("Player-Sprite", True, self.text_color)
+
+        player_text_rect = player_text.get_rect(center=(player_sprite_abs_rect.centerx, player_sprite_abs_rect.top + 15))
+        self.screen.blit(player_text, player_text_rect)
+
+        player_draw_rect = player_sprite_abs_rect.inflate(-10, -10)
+        player_draw_rect.top = player_text_rect.bottom + 5
+        player_draw_rect.height = player_sprite_abs_rect.height - (player_draw_rect.top - player_sprite_abs_rect.top) - (player_sprite_abs_rect.height - player_draw_rect.bottom)
+        
+        player_sprite = self.player.get_current_sprite() 
+        if player_sprite:
+
+            sprite_width, sprite_height = player_sprite.get_size()
+            target_width_ratio = player_draw_rect.width / sprite_width
+            target_height_ratio = player_draw_rect.height / sprite_height
+
+            scale_factor = min(target_width_ratio, target_height_ratio)
+            
+            scaled_sprite = pygame.transform.scale(player_sprite, (int(sprite_width * scale_factor), int(sprite_height * scale_factor)))
+            
+            scaled_sprite_rect = scaled_sprite.get_rect(center=player_draw_rect.center)
+            self.screen.blit(scaled_sprite, scaled_sprite_rect)
+
+
+        item_list_abs_rect = self.get_abs_rect(self.item_list_area_rel)
+        pygame.draw.rect(self.screen, self.border_color, item_list_abs_rect, 1)
+
+        item_name_header_text = self.font.render("Inventory (Items x Stack)", True, self.text_color)
+        item_name_header_rect = item_name_header_text.get_rect(midleft=(item_list_abs_rect.left + 5, item_list_abs_rect.top + self.item_list_start_y_offset // 2))
+        self.screen.blit(item_name_header_text, item_name_header_rect)
+
+
+        current_y = item_list_abs_rect.top + self.item_list_start_y_offset
+        current_items = self.player_inventory.get_items()
+        
+        for i, item in enumerate(current_items):
+            if i >= self.max_visible_items:
+                break
+
+            item_text = f"{item.name} x{item.current_stack}"
+            text_surface = self.font.render(item_text, True, self.text_color)
+            
+            item_rect = pygame.Rect(item_list_abs_rect.left + 5, current_y, item_list_abs_rect.width - 10, self.item_list_line_height - 5)
+            
+            if i == self.selected_item_index:
+                pygame.draw.rect(self.screen, self.highlight_color, item_rect, 0)
+                pygame.draw.rect(self.screen, self.text_color, item_rect, 1)
+
+            self.screen.blit(text_surface, (item_rect.left, item_rect.centery - text_surface.get_height() // 2))
+            current_y += self.item_list_line_height
+
+        if self.selected_item:
+
+            item_name_header_abs_rect = self.get_abs_rect(self.item_name_header_rel)
+            pygame.draw.rect(self.screen, self.border_color, item_name_header_abs_rect, 1)
+            name_text_surface = self.font.render(f"Name: {self.selected_item.name}", True, self.text_color)
+            name_text_rect = name_text_surface.get_rect(midleft=(item_name_header_abs_rect.left + 5, item_name_header_abs_rect.centery))
+            self.screen.blit(name_text_surface, name_text_rect)
+
+            item_value_header_abs_rect = self.get_abs_rect(self.item_value_header_rel)
+            pygame.draw.rect(self.screen, self.border_color, item_value_header_abs_rect, 1)
+            value_text_surface = self.font.render(f"Value: {self.selected_item.value}g", True, self.text_color)
+            value_text_rect = value_text_surface.get_rect(midleft=(item_value_header_abs_rect.left + 5, item_value_header_abs_rect.centery))
+            self.screen.blit(value_text_surface, value_text_rect)
+
+            selected_item_sprite_abs_rect = self.get_abs_rect(self.selected_item_sprite_area_rel)
+            pygame.draw.rect(self.screen, self.border_color, selected_item_sprite_abs_rect, 1)
+            
+            item_sprite = self.selected_item.get_sprite()
+            if item_sprite:
+
+                sprite_width, sprite_height = item_sprite.get_size()
+                target_width_ratio = selected_item_sprite_abs_rect.width / sprite_width
+                target_height_ratio = selected_item_sprite_abs_rect.height / sprite_height
+                scale_factor = min(target_width_ratio, target_height_ratio)
+                
+                scaled_item_sprite = pygame.transform.scale(item_sprite, (int(sprite_width * scale_factor), int(sprite_height * scale_factor)))
+                scaled_item_sprite_rect = scaled_item_sprite.get_rect(center=selected_item_sprite_abs_rect.center)
+                self.screen.blit(scaled_item_sprite, scaled_item_sprite_rect)
+
+            description_stats_abs_rect = self.get_abs_rect(self.description_stats_area_rel)
+            pygame.draw.rect(self.screen, self.border_color, description_stats_abs_rect, 1)
+            
+            current_y_for_text = description_stats_abs_rect.top + 5
+            
+            description_lines_rendered = self._render_text_with_wrapping(
+                self.screen,
+                self.selected_item.description,
+                self.small_font,
+                self.text_color,
+                pygame.Rect(description_stats_abs_rect.left + 5, current_y_for_text,
+                            description_stats_abs_rect.width - 10, description_stats_abs_rect.height - 10)
+            )
+            
+            current_y_for_text += description_lines_rendered * self.small_font.get_height() + 5
+
+            if self.selected_item is not None and isinstance(self.selected_item, IronSword): 
+                iron_sword_item: IronSword = self.selected_item
+                
+                if current_y_for_text + self.small_font.get_height() <= description_stats_abs_rect.bottom:
+
+                    damage_text = self.small_font.render(f"Damage: {iron_sword_item.damage}", True, self.text_color)
+                    self.screen.blit(damage_text, (description_stats_abs_rect.left + 5, current_y_for_text))
+                    current_y_for_text += self.small_font.get_height() + 5
+
+
+    def handle_event(self, event: pygame.event.Event):
+        """Handles events for the inventory view."""
+        if not self.is_open:
+            return
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mouse_pos = event.pos
+            item_list_abs_rect = self.get_abs_rect(self.item_list_area_rel)
+
+            if item_list_abs_rect.collidepoint(mouse_pos):
+                local_y = mouse_pos[1] - (item_list_abs_rect.top + self.item_list_start_y_offset)
+                
+                clicked_index_in_visible_list = local_y // self.item_list_line_height
+
+                current_items = self.player_inventory.get_items()
+                if 0 <= clicked_index_in_visible_list < len(current_items) and \
+                   clicked_index_in_visible_list < self.max_visible_items:
+                    
+                    self.selected_item_index = clicked_index_in_visible_list 
+                    self.selected_item = current_items[clicked_index_in_visible_list] 
+
+    def get_abs_rect(self, relative_rect: pygame.Rect) -> pygame.Rect:
+        """Converts a relative Rect (relative to main inventory window) to an absolute screen Rect."""
+        return pygame.Rect(
+            self.x + relative_rect.x,
+            self.y + relative_rect.y,
+            relative_rect.width,
+            relative_rect.height
+        )
+
+    def _render_text_with_wrapping(self, surface: pygame.Surface, text: str, font: pygame.font.Font, color: Tuple[int, int, int], rect: pygame.Rect) -> int:
+        """
+        Renders text within a rectangle, wrapping words if necessary.
+        Returns the number of lines rendered.
+        """
+        if not text:
+            return 0
+
+        words = text.split(' ')
+        lines: List[str] = []
+        current_line: List[str] = []
+        
+        if rect.width <= 0:
+            return 0
+
+        for word in words:
+            test_text = ' '.join(current_line + [word])
+            
+            if font.size(test_text)[0] > rect.width:
+                if not current_line:
+
+                    broken_word = ""
+                    for char_idx, char in enumerate(word):
+                        test_part = broken_word + char
+                        if font.size(test_part)[0] > rect.width and broken_word:
+                            lines.append(broken_word)
+                            broken_word = char
+                        else:
+                            broken_word += char
+                    if broken_word: lines.append(broken_word)
+                else:
+                    lines.append(' '.join(current_line))
+                current_line = [word]
+            else:
+                current_line.append(word)
+        
+        if current_line:
+            lines.append(' '.join(current_line))
+
+        y_offset = rect.top
+        lines_rendered = 0
+        for line in lines:
+            line_surface = font.render(line, True, color)
+            if y_offset + line_surface.get_height() <= rect.bottom:
+                surface.blit(line_surface, (rect.left, y_offset))
+                y_offset += line_surface.get_height()
+                lines_rendered += 1
+            else:
+                break
+        return lines_rendered
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+chest_view.py
+```
+import pygame
+from engine.world.objects.chest import Chest
+from engine.player.inventory.player_inventory import PlayerInventory
+from engine.items.base_item import BaseItem
+from engine.items.item_registry import get_item_class 
+from typing import List, Optional, Tuple
+
+class ChestView:
+    """
+    Displays the contents of a chest and allows transferring items
+    between the chest and the player's inventory.
+    """
+    def __init__(self, screen: pygame.Surface, player_inventory: PlayerInventory, player):
+        self.screen = screen
+        self.player_inventory = player_inventory
+        self.player = player 
+        self.is_open = False
+        self.opened_chest: Optional[Chest] = None
+
+        self.width = 1000 
+        self.height = 600
+        self.x = (self.screen.get_width() - self.width) // 2
+        self.y = (self.screen.get_height() - self.height) // 2
+        self.rect = pygame.Rect(self.x, self.y, self.width, self.height)
+
+        self.background_color = (30, 30, 30, 200)
+        self.border_color = (100, 100, 100)
+        self.text_color = (255, 255, 255)
+        self.highlight_color = (50, 150, 255)
+        self.font = pygame.font.Font(None, 24)
+        self.small_font = pygame.font.Font(None, 18)
+
+        self.player_panel_rel = pygame.Rect(10, 10, self.width // 2 - 20, self.height - 20)
+        self.player_item_list_start_y_offset = 30
+        self.player_max_visible_items = (self.player_panel_rel.height - self.player_item_list_start_y_offset) // (self.font.get_height() + 5)
+        self.player_selected_item_index: Optional[int] = None
+        self.player_selected_item: Optional[BaseItem] = None
+
+        self.chest_panel_rel = pygame.Rect(self.width // 2 + 10, 10, self.width // 2 - 20, self.height - 20)
+        self.chest_item_list_start_y_offset = 30
+        self.chest_max_visible_items = (self.chest_panel_rel.height - self.chest_item_list_start_y_offset) // (self.font.get_height() + 5)
+        self.chest_selected_item_index: Optional[int] = None
+        self.chest_selected_item: Optional[BaseItem] = None
+
+        self.item_list_line_height = self.font.get_height() + 5
+        
+        self.transfer_button = pygame.Rect(self.x + self.width // 2 - 50, self.y + self.height - 40, 100, 30)
+
+    def open(self, chest: Chest):
+        """Opens the chest view for a specific chest."""
+        self.opened_chest = chest
+        self.is_open = True
+        self.player_selected_item_index = None
+        self.player_selected_item = None
+        self.chest_selected_item_index = None
+        self.chest_selected_item = None
+        if self.player_inventory.get_items():
+            self.player_selected_item_index = 0
+            self.player_selected_item = self.player_inventory.get_items()[0]
+        if self.opened_chest and self.opened_chest.inventory.get_items():
+            self.chest_selected_item_index = 0
+            self.chest_selected_item = self.opened_chest.inventory.get_items()[0]
+        print(f"Chest '{self.opened_chest.chest_id}' view opened." if self.opened_chest else "Error opening chest: No chest provided.")
+        if self.opened_chest:
+            self.opened_chest.is_open = True
+
+    def close(self):
+        """Closes the chest view."""
+        if self.opened_chest:
+            self.opened_chest.is_open = False
+            self.opened_chest.inventory.save_inventory()
+            self.opened_chest = None
+        self.is_open = False
+        print("Chest view closed.")
+
+    def draw(self):
+        """Draws the chest view and its contents."""
+        if not self.is_open or not self.opened_chest:
+            return
+        
+        assert self.opened_chest is not None, "chest_view.draw called when opened_chest is None"
+
+        main_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        main_surface.fill(self.background_color)
+        pygame.draw.rect(main_surface, self.border_color, main_surface.get_rect(), 2)
+        self.screen.blit(main_surface, (self.x, self.y))
+
+        self._draw_inventory_panel(
+            self.player_panel_rel, 
+            "Player Inventory", 
+            self.player_inventory.get_items(), 
+            self.player_selected_item_index, 
+            self.player_item_list_start_y_offset, 
+            self.player_max_visible_items,
+            is_player_panel=True
+        )
+
+        self._draw_inventory_panel(
+            self.chest_panel_rel, 
+            f"Chest: {self.opened_chest.chest_id}", 
+            self.opened_chest.inventory.get_items(), 
+            self.chest_selected_item_index, 
+            self.chest_item_list_start_y_offset, 
+            self.chest_max_visible_items,
+            is_player_panel=False
+        )
+
+        self._draw_item_details_panels()
+
+        transfer_abs_rect = self.get_abs_rect(pygame.Rect(self.width // 2 - 50, self.height - 40, 100, 30))
+        pygame.draw.rect(self.screen, self.highlight_color, transfer_abs_rect)
+        pygame.draw.rect(self.screen, self.border_color, transfer_abs_rect, 2)
+        transfer_text = self.font.render("Transfer", True, self.text_color)
+        self.screen.blit(transfer_text, transfer_text.get_rect(center=transfer_abs_rect.center))
+
+    def _draw_inventory_panel(self, rel_rect: pygame.Rect, title: str, 
+                               items: List[BaseItem], selected_index: Optional[int],
+                               start_y_offset: int, max_visible_items: int,
+                               is_player_panel: bool):
+        """Helper to draw inventory lists."""
+        abs_rect = self.get_abs_rect(rel_rect)
+        pygame.draw.rect(self.screen, self.border_color, abs_rect, 1)
+
+        title_text = self.font.render(title, True, self.text_color)
+        title_text_rect = title_text.get_rect(midleft=(abs_rect.left + 5, abs_rect.top + start_y_offset // 2))
+        self.screen.blit(title_text, title_text_rect)
+
+        current_y = abs_rect.top + start_y_offset
+        for i, item in enumerate(items):
+            if i >= max_visible_items:
+                break
+
+            item_text = f"{item.name} x{item.current_stack}"
+            text_surface = self.font.render(item_text, True, self.text_color)
+            
+            item_rect = pygame.Rect(abs_rect.left + 5, current_y, abs_rect.width - 10, self.item_list_line_height - 5)
+            
+            if i == selected_index:
+                pygame.draw.rect(self.screen, self.highlight_color, item_rect, 0)
+                pygame.draw.rect(self.screen, self.text_color, item_rect, 1)
+
+            self.screen.blit(text_surface, (item_rect.left, item_rect.centery - text_surface.get_height() // 2))
+            current_y += self.item_list_line_height
+
+    def _draw_item_details_panels(self):
+        """Draws detail panels for selected items from both inventories."""
+        
+        item_to_show_details: Optional[BaseItem] = None
+        
+        if self.player_selected_item:
+            item_to_show_details = self.player_selected_item
+        elif self.chest_selected_item:
+            item_to_show_details = self.chest_selected_item
+
+        if item_to_show_details:
+            detail_panel_x = self.x + 10
+            detail_panel_y = self.y + self.height - 180
+            detail_panel_width = self.width - 20 
+            detail_panel_height = 170
+
+            detail_panel_abs_rect = pygame.Rect(detail_panel_x, detail_panel_y, detail_panel_width, detail_panel_height)
+            pygame.draw.rect(self.screen, (20, 20, 20), detail_panel_abs_rect)
+            pygame.draw.rect(self.screen, self.border_color, detail_panel_abs_rect, 1)
+
+            name_surface = self.font.render(f"Name: {item_to_show_details.name}", True, self.text_color)
+            self.screen.blit(name_surface, (detail_panel_abs_rect.left + 10, detail_panel_abs_rect.top + 10))
+
+            value_surface = self.font.render(f"Value: {item_to_show_details.value}g", True, self.text_color)
+            self.screen.blit(value_surface, (detail_panel_abs_rect.left + 10, detail_panel_abs_rect.top + 35))
+
+            item_sprite_rect = pygame.Rect(detail_panel_abs_rect.left + detail_panel_abs_rect.width - 70, detail_panel_abs_rect.top + 10, 60, 60)
+            item_sprite = item_to_show_details.get_sprite()
+            if item_sprite:
+                sprite_width, sprite_height = item_sprite.get_size()
+                aspect_ratio = sprite_width / sprite_height
+                
+                if aspect_ratio > 1:
+                    scaled_width = 60
+                    scaled_height = int(60 / aspect_ratio)
+                else:
+                    scaled_height = 60
+                    scaled_width = int(60 * aspect_ratio)
+
+                scaled_item_sprite = pygame.transform.scale(item_sprite, (scaled_width, scaled_height))
+                scaled_sprite_rect = scaled_item_sprite.get_rect(center=item_sprite_rect.center)
+                self.screen.blit(scaled_item_sprite, scaled_sprite_rect)
+            
+            description_rect = pygame.Rect(detail_panel_abs_rect.left + 10, detail_panel_abs_rect.top + 60, 
+                                           detail_panel_abs_rect.width - 20, detail_panel_abs_rect.height - 70)
+            self._render_text_with_wrapping(
+                self.screen,
+                item_to_show_details.description,
+                self.small_font,
+                self.text_color,
+                description_rect
+            )
+
+    def handle_event(self, event: pygame.event.Event):
+        """Handles events for the chest view."""
+        if not self.is_open or not self.opened_chest:
+            return
+        
+        assert self.opened_chest is not None, "chest_view.handle_event called when opened_chest is None"
+
+        if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION):
+            mouse_pos = (event.pos[0] - self.x, event.pos[1] - self.y)
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                player_panel_abs_rect = self.get_abs_rect(self.player_panel_rel)
+                if player_panel_abs_rect.collidepoint(event.pos):
+                    local_y = event.pos[1] - (player_panel_abs_rect.top + self.player_item_list_start_y_offset)
+                    clicked_index = local_y // self.item_list_line_height
+                    current_player_items = self.player_inventory.get_items()
+                    if 0 <= clicked_index < len(current_player_items):
+                        self.player_selected_item_index = clicked_index
+                        self.player_selected_item = current_player_items[clicked_index]
+                        self.chest_selected_item = None
+                        self.chest_selected_item_index = None
+                    return
+
+                chest_panel_abs_rect = self.get_abs_rect(self.chest_panel_rel)
+                if chest_panel_abs_rect.collidepoint(event.pos):
+                    local_y = event.pos[1] - (chest_panel_abs_rect.top + self.chest_item_list_start_y_offset)
+                    clicked_index = local_y // self.item_list_line_height
+                    current_chest_items = self.opened_chest.inventory.get_items() 
+                    if 0 <= clicked_index < len(current_chest_items):
+                        self.chest_selected_item_index = clicked_index
+                        self.chest_selected_item = current_chest_items[clicked_index]
+                        self.player_selected_item = None
+                        self.player_selected_item_index = None
+                    return
+
+                transfer_abs_rect = self.get_abs_rect(pygame.Rect(self.width // 2 - 50, self.height - 40, 100, 30))
+                if transfer_abs_rect.collidepoint(event.pos):
+                    self._handle_transfer()
+                    return
+
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.close()
+
+    def _handle_transfer(self):
+        """
+        Attempts to transfer the currently selected item.
+        If player item is selected, transfer to chest.
+        If chest item is selected, transfer to player.
+        """
+        assert self.opened_chest is not None, "_handle_transfer called when opened_chest is None"
+
+        quantity_to_transfer = 1
+
+        if self.player_selected_item:
+            item = self.player_selected_item
+            if self.player_inventory.remove_item(item, quantity_to_transfer):
+                item_class = get_item_class(item.item_id)
+                if item_class:
+                    transferred_item_instance = item_class() 
+                    if self.opened_chest.inventory.add_item(transferred_item_instance, quantity_to_transfer): 
+                        print(f"Transferred {quantity_to_transfer} {item.name} from Player to Chest.")
+                    else:
+                        self.player_inventory.add_item(item, quantity_to_transfer)
+                        print(f"Failed to transfer {item.name} to Chest (full).")
+                else:
+                    self.player_inventory.add_item(item, quantity_to_transfer)
+                    print(f"Failed to find item class for {item.name}.")
+            else:
+                print(f"Failed to remove {item.name} from Player inventory.")
+
+        elif self.chest_selected_item:
+            item = self.chest_selected_item
+            if self.opened_chest.inventory.remove_item(item, quantity_to_transfer): 
+                item_class = get_item_class(item.item_id)
+                if item_class:
+                    transferred_item_instance = item_class()
+                    if self.player_inventory.add_item(transferred_item_instance, quantity_to_transfer):
+                        print(f"Transferred {quantity_to_transfer} {item.name} from Chest to Player.")
+                    else:
+                        self.opened_chest.inventory.add_item(item, quantity_to_transfer)
+                        print(f"Failed to transfer {item.name} to Player (full).")
+                else: 
+                    self.opened_chest.inventory.add_item(item, quantity_to_transfer)
+                    print(f"Failed to find item class for {item.name}.")
+            else:
+                print(f"Failed to remove {item.name} from Chest inventory.")
+        else:
+            print("No item selected for transfer.")
+
+        self._update_selections_after_transfer()
+
+    def _update_selections_after_transfer(self):
+        """Ensures selected item indices are still valid after item removal/addition."""
+        
+        current_player_items = self.player_inventory.get_items()
+        
+        if self.player_selected_item_index is not None and self.player_selected_item:
+            if self.player_selected_item_index < len(current_player_items) and \
+               current_player_items[self.player_selected_item_index] is self.player_selected_item:
+                pass
+            else:
+                found_new_index = -1
+                for i, item in enumerate(current_player_items):
+                    if item.item_id == self.player_selected_item.item_id:
+                        found_new_index = i
+                        break
+                if found_new_index != -1:
+                    self.player_selected_item_index = found_new_index
+                    self.player_selected_item = current_player_items[found_new_index]
+                else:
+                    self.player_selected_item_index = None
+                    self.player_selected_item = None
+        
+        if self.player_selected_item_index is None and current_player_items:
+            self.player_selected_item_index = 0
+            self.player_selected_item = current_player_items[0]
+        elif not current_player_items:
+            self.player_selected_item_index = None
+            self.player_selected_item = None
+
+
+        assert self.opened_chest is not None, "opened_chest is None in _update_selections_after_transfer"
+        current_chest_items = self.opened_chest.inventory.get_items() 
+
+        if self.chest_selected_item_index is not None and self.chest_selected_item:
+            if self.chest_selected_item_index < len(current_chest_items) and \
+               current_chest_items[self.chest_selected_item_index] is self.chest_selected_item:
+                pass
+            else:
+                found_new_index = -1
+                for i, item in enumerate(current_chest_items):
+                    if item.item_id == self.chest_selected_item.item_id:
+                        found_new_index = i
+                        break
+                if found_new_index != -1:
+                    self.chest_selected_item_index = found_new_index
+                    self.chest_selected_item = current_chest_items[found_new_index]
+                else:
+                    self.chest_selected_item_index = None
+                    self.chest_selected_item = None
+        
+        if self.chest_selected_item_index is None and current_chest_items:
+            self.chest_selected_item_index = 0
+            self.chest_selected_item = current_chest_items[0]
+        elif not current_chest_items:
+            self.chest_selected_item_index = None
+            self.chest_selected_item = None
+
+    def get_abs_rect(self, relative_rect: pygame.Rect) -> pygame.Rect:
+        """Converts a relative Rect (relative to main inventory window) to an absolute screen Rect."""
+        return pygame.Rect(
+            self.x + relative_rect.x,
+            self.y + relative_rect.y,
+            relative_rect.width,
+            relative_rect.height
+        )
+
+    def _render_text_with_wrapping(self, surface: pygame.Surface, text: str, font: pygame.font.Font, color: Tuple[int, int, int], rect: pygame.Rect) -> int:
+        """
+        Renders text within a rectangle, wrapping words if necessary.
+        Returns the number of lines rendered.
+        """
+        if not text:
+            return 0
+
+        words = text.split(' ')
+        lines: List[str] = []
+        current_line: List[str] = []
+        
+        if rect.width <= 0:
+            return 0
+
+        for word in words:
+            test_text = ' '.join(current_line + [word])
+            
+            if font.size(test_text)[0] > rect.width:
+                if not current_line:
+
+                    broken_word = ""
+                    for char_idx, char in enumerate(word):
+                        test_part = broken_word + char
+                        if font.size(test_part)[0] > rect.width and broken_word:
+                            lines.append(broken_word)
+                            broken_word = char
+                        else:
+                            broken_word += char
+                    if broken_word: lines.append(broken_word)
+                else:
+                    lines.append(' '.join(current_line))
+                current_line = [word]
+            else:
+                current_line.append(word)
+        
+        if current_line:
+            lines.append(' '.join(current_line))
+
+        y_offset = rect.top
+        lines_rendered = 0
+        for line in lines:
+            line_surface = font.render(line, True, color)
+            if y_offset + line_surface.get_height() <= rect.bottom:
+                surface.blit(line_surface, (rect.left, y_offset))
+                y_offset += line_surface.get_height()
+                lines_rendered += 1
+            else:
+                break
+        return lines_rendered
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+popup/__init__.py
+```
+from .inventory_view import InventoryView
+
+from .chest_view import ChestView
+
+__all__ = [
+    'InventoryView',
+    'ChestView'
+]
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+chunkloader.py
+```
+from engine.world.outdoor.world_generator import WorldGenerator
+from engine.world.chunk import Chunk
+from engine.display import Display
+from engine.world.pixel_map_reader import PixelMapReader
+
+class ChunkLoader:
+    """
+    Manages loading, unloading, and providing access to chunks around the player.
+    """
+    LOAD_RADIUS = 2
+
+    def __init__(self):
+        self.loaded_chunks = {}
+        self.world_generator = WorldGenerator()
+        self.current_player_chunk_x = -9999999
+        self.current_player_chunk_y = -9999999
+        self.player_world_x_meters = 0.0
+        self.player_world_y_meters = 0.0
+
+    def _get_chunk(self, chunk_x, chunk_y):
+        """
+        Retrieves a chunk from memory or generates it if it doesn't exist.
+        """
+        chunk_coords = (chunk_x, chunk_y)
+        if chunk_coords not in self.loaded_chunks:
+            self.loaded_chunks[chunk_coords] = self.world_generator.generate_chunk(chunk_x, chunk_y)
+        return self.loaded_chunks[chunk_coords]
+
+    def update(self, player_world_x, player_world_y):
+        """
+        Updates the loaded chunks based on the player's current world position in pixels.
+        Loads new chunks and unloads distant ones if the player crosses a chunk boundary.
+        :param player_world_x: Player's x-coordinate in absolute world pixels.
+        :param player_world_y: Player's y-coordinate in absolute world pixels.
+        """
+        self.player_world_x_meters = player_world_x / Display.PIXELS_PER_METER
+        self.player_world_y_meters = player_world_y / Display.PIXELS_PER_METER
+
+        player_chunk_x = int(self.player_world_x_meters / self.world_generator.CHUNK_SIZE_METERS)
+        player_chunk_y = int(self.player_world_y_meters / self.world_generator.CHUNK_SIZE_METERS)
+
+        if player_chunk_x != self.current_player_chunk_x or \
+           player_chunk_y != self.current_player_chunk_y:
+            
+            self.current_player_chunk_x = player_chunk_x
+            self.current_player_chunk_y = player_chunk_y
+            self._load_and_unload_chunks()
+
+    def _load_and_unload_chunks(self):
+        """
+        Determines which chunks should be loaded/unloaded based on the current player chunk.
+        """
+        chunks_to_keep = set()
+
+        min_cx = self.current_player_chunk_x - self.LOAD_RADIUS
+        max_cx = self.current_player_chunk_x + self.LOAD_RADIUS
+        min_cy = self.current_player_chunk_y - self.LOAD_RADIUS
+        max_cy = self.current_player_chunk_y + self.LOAD_RADIUS
+
+        for cx in range(min_cx, max_cx + 1):
+            for cy in range(min_cy, max_cy + 1):
+                chunk_coords = (cx, cy)
+                chunks_to_keep.add(chunk_coords)
+                if chunk_coords not in self.loaded_chunks:
+                    self.loaded_chunks[chunk_coords] = self.world_generator.generate_chunk(cx, cy)
+
+
+        chunks_to_remove = [c for c in self.loaded_chunks if c not in chunks_to_keep]
+        for c in chunks_to_remove:
+            del self.loaded_chunks[c]
+
+    def get_chunks_to_draw(self):
+        """
+        Returns a list of all currently loaded chunks.
+        """
+        return list(self.loaded_chunks.values())
+
+    def get_player_coordinates_for_map_debug(self):
+        """
+        Returns the player's world coordinates (in meters) and their
+        corresponding pixel coordinates on the pixel_map.png for debugging.
+        """
+        world_x_m = self.player_world_x_meters
+        world_y_m = self.player_world_y_meters
+
+        pixel_x_on_map = world_x_m / PixelMapReader.WORLD_SCALE_METERS_PER_PIXEL
+        pixel_y_on_map = world_y_m / PixelMapReader.WORLD_SCALE_METERS_PER_PIXEL
+
+        return (world_x_m, world_y_m, pixel_x_on_map, pixel_y_on_map)
+
+    def get_tile_world_pixel_coords(self, global_tile_x, global_tile_y):
+        """
+        Calculates the top-left pixel coordinates in the world for a given global tile index.
+        """
+        world_pixel_x = global_tile_x * Display.TILE_SIZE_PIXELS
+        world_pixel_y = global_tile_y * Display.TILE_SIZE_PIXELS
+        return world_pixel_x, world_pixel_y
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+world_generator.py
+```
+from engine.world.chunk import Chunk
+from engine.world.outdoor.biomes.fields import FieldsBiome
+from engine.world.outdoor.biomes.coast import CoastBiome
+from engine.world.outdoor.biomes.desert import DesertBiome
+from engine.world.outdoor.biomes.mountain import MountainBiome
+from engine.world.outdoor.biomes.forest import ForestBiome
+from engine.world.outdoor.biomes.ocean import OceanBiome
+from engine.world.outdoor.biomes.river import RiverBiome
+from engine.world.outdoor.biomes.snow import SnowBiome
+from engine.world.outdoor.biomes.road import RoadBiome
+from engine.world.pixel_map_reader import PixelMapReader
+import random
+
+class WorldGenerator:
+    """
+    Generates chunks for the game world based on specified biomes.
+    """
+
+    TILE_SIZE_IN_METERS = 2
+
+    CHUNK_SIZE_METERS = Chunk.CHUNK_SIZE_TILES * TILE_SIZE_IN_METERS
+
+    def __init__(self, seed=None):
+        self.seed = seed
+        self.biomes = {
+            "fields": FieldsBiome(),
+            "coast": CoastBiome(),
+            "desert": DesertBiome(),
+            "mountain": MountainBiome(),
+            "forest": ForestBiome(),
+            "ocean": OceanBiome(),
+            "river": RiverBiome(),
+            "snow": SnowBiome(),
+            "road": RoadBiome()
+
+        }
+        self.biome_names = list(self.biomes.keys())
+
+        random.seed(seed if seed is not None else 42)
+
+        self.pixel_map_reader = PixelMapReader()
+
+    def generate_chunk(self, chunk_x, chunk_y):
+        """
+        Generates a new Chunk at the given chunk coordinates,
+        determining its biome based on the pixel_map.png.
+        """
+        new_chunk = Chunk(chunk_x, chunk_y)
+
+        world_center_x = (chunk_x * self.CHUNK_SIZE_METERS) + (self.CHUNK_SIZE_METERS / 2)
+        world_center_y = (chunk_y * self.CHUNK_SIZE_METERS) + (self.CHUNK_SIZE_METERS / 2)
+
+        selected_biome_name = self.pixel_map_reader.get_biome_type(world_center_x, world_center_y)
+
+        selected_biome_generator = self.biomes.get(selected_biome_name)
+
+        if selected_biome_name == "static_zone":
+            print(f"DEBUG: Chunk ({chunk_x}, {chunk_y}) flagged as STATIC ZONE. Special loading logic will be needed here.")
+            selected_biome_generator = self.biomes.get("ocean")
+            print("         (Currently defaulting to Ocean for static zones for demonstration purposes.)")
+
+        if selected_biome_generator:
+            print(f"Generating chunk ({chunk_x}, {chunk_y}) as {selected_biome_name} biome (from map data).")
+            new_chunk.populate(selected_biome_generator.generate_tile)
+        else:
+
+            print(f"WARNING: No generator found for biome '{selected_biome_name}' from map. Defaulting to Ocean.")
+            new_chunk.populate(self.biomes["ocean"].generate_tile)
+
+        return new_chunk
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+snow.py
+```
+from engine.world.tile import Tile
+import random
+
+class SnowBiome:
+    """
+    A biome generator for snow and ice areas.
+    """
+    def __init__(self):
+        self.snow_colors = [
+            (230, 230, 250),
+            (240, 240, 255),
+            (200, 200, 220)
+        ]
+        self.ice_colors = [
+            (180, 220, 240),
+            (170, 210, 230)
+        ]
+
+    def generate_tile(self, global_tile_x, global_tile_y):
+        """
+        Generates a Tile object for the given global tile coordinates within the Snow biome.
+        """
+        if (global_tile_x * global_tile_y) % 9 == 0:
+            color = random.choice(self.ice_colors)
+            return Tile("ice", color)
+        else:
+            color = random.choice(self.snow_colors)
+            return Tile("snow", color)
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+road.py
+```
+from engine.world.tile import Tile
+import random
+
+class RoadBiome:
+    """
+    A biome generator for road areas.
+    Generates road and adjacent shoulder/dirt tiles.
+    """
+    def __init__(self):
+        self.road_colors = [
+            (80, 80, 80),
+            (90, 90, 90),
+        ]
+        self.shoulder_colors = [
+            (140, 100, 60),
+            (150, 110, 70),
+        ]
+
+    def generate_tile(self, global_tile_x, global_tile_y):
+        """
+        Generates a Tile object for the given global tile coordinates within the Road biome.
+        This simple pattern creates a central 'road' strip with 'shoulder' on either side.
+        You might want to refine this with a more sophisticated noise or pattern generation
+        if roads will have varying widths or design.
+        """
+        local_x = global_tile_x % 5
+        local_y = global_tile_y % 5
+
+        if (1 <= local_x <= 3) and (1 <= local_y <= 3):
+             color = random.choice(self.road_colors)
+             return Tile("road_surface", color)
+        else:
+             color = random.choice(self.shoulder_colors)
+             return Tile("road_shoulder", color)
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+chest.py
+```
+import pygame
+import os
+import math
+from engine.world.objects.inventory.chest_inventory import ChestInventory
+from typing import Optional, Tuple
+from engine.items.base_item import BaseItem 
+from engine.display import Display
+from game_config import CHEST_SPRITE_CLOSED_PATH, CHEST_SPRITE_OPEN_PATH 
+
+class Chest:
+    """
+    Represents an interactive chest object in the world.
+    Contains an inventory and can be opened by the player.
+    """
+    def __init__(self, chest_id: str, x: float, y: float, 
+                 width: int = Display.TILE_SIZE_PIXELS, 
+                 height: int = Display.TILE_SIZE_PIXELS):
+        self.chest_id = chest_id
+        self.world_x = x
+        self.world_y = y
+        self.width = width
+        self.height = height
+        self.rect = pygame.Rect(self.world_x, self.world_y, self.width, self.height)
+        self.inventory = ChestInventory(chest_id)
+        self.is_open = False
+        self._sprite_closed: Optional[pygame.Surface] = None
+        self._sprite_open: Optional[pygame.Surface] = None
+        self._load_sprites()
+
+    def _load_sprites(self):
+        """Loads closed and open chest sprites."""
+        try:
+            game_root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            
+            closed_path = os.path.join(game_root_dir, CHEST_SPRITE_CLOSED_PATH)
+            open_path = os.path.join(game_root_dir, CHEST_SPRITE_OPEN_PATH)
+
+            if os.path.exists(closed_path):
+                self._sprite_closed = pygame.image.load(closed_path).convert_alpha()
+
+                self._sprite_closed = pygame.transform.scale(self._sprite_closed, (self.width, self.height))
+            else:
+                print(f"Warning: Chest closed sprite not found at {closed_path}")
+
+            if os.path.exists(open_path):
+                self._sprite_open = pygame.image.load(open_path).convert_alpha()
+
+                self._sprite_open = pygame.transform.scale(self._sprite_open, (self.width, self.height))
+            else:
+                print(f"Warning: Chest open sprite not found at {open_path}")
+
+        except pygame.error as e:
+            print(f"Error loading chest sprites: {e}. Using default rectangles.")
+            self._sprite_closed = None
+            self._sprite_open = None
+
+    def get_current_sprite(self) -> Optional[pygame.Surface]:
+        """Returns the appropriate sprite based on the chest's open state."""
+        if self.is_open and self._sprite_open:
+            return self._sprite_open
+        elif self._sprite_closed:
+            return self._sprite_closed
+        return None
+
+    def toggle_open(self):
+        """Toggles the open state of the chest."""
+        self.is_open = not self.is_open
+        print(f"Chest {self.chest_id} is now {'open' if self.is_open else 'closed'}.")
+        if not self.is_open:
+            self.inventory.save_inventory()
+
+    def is_interactable(self, player_x: float, player_y: float) -> bool:
+        """
+        Checks if the player is close enough to interact with the chest.
+        A simple AABB distance check.
+        """
+
+        distance = ((player_x - self.world_x)**2 + (player_y - self.world_y)**2)**0.5
+
+        INTERACT_RADIUS_PIXELS = Display.TILE_SIZE_PIXELS * 2
+        chest_center_x = self.world_x + self.width / 2
+        chest_center_y = self.world_y + self.height / 2
+        
+        distance_to_center = math.hypot(player_x - chest_center_x, player_y - chest_center_y)
+        
+        return distance_to_center < INTERACT_RADIUS_PIXELS
+
+    def get_collision_rect(self) -> pygame.Rect: 
+        """
+        Returns the collision bounding box for the chest in world coordinates.
+        """
+        return pygame.Rect(self.world_x, self.world_y, self.width, self.height)
+
+
+    def draw(self, screen: pygame.Surface, camera_offset_x: float, camera_offset_y: float):
+        """
+        Draws the chest on the screen, applying camera offset.
+        """
+        screen_x = int(self.world_x - camera_offset_x)
+        screen_y = int(self.world_y - camera_offset_y)
+
+        draw_rect = pygame.Rect(screen_x, screen_y, self.width, self.height)
+        
+        current_sprite = self.get_current_sprite()
+        if current_sprite:
+            screen.blit(current_sprite, draw_rect)
+        else:
+
+            pygame.draw.rect(screen, (139, 69, 19), draw_rect)
+            if self.is_open:
+                pygame.draw.rect(screen, (255, 255, 0), draw_rect, 2)
+
+    def save_state(self):
+        """Saves the chest's current state (open/closed, inventory)."""
+        self.inventory.save_inventory()
+        
+    def load_state(self):
+        """Loads the chest's state (inventory)."""
+        self.inventory._load_inventory()
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+chest_manager.py
+```
+import json
+import os
+import pygame
+from typing import Dict, List, Optional
+from engine.world.objects.chest import Chest
+from engine.display import Display
+from engine.items.base_item import BaseItem
+from engine.items.weapons.swords.iron_sword import IronSword
+
+class ChestManager:
+    """
+    Manages loading, saving, and interaction with all chests in the game world.
+    """
+    CHEST_DATA_FILE = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+        "user_data", "chests", "chests_metadata.json"
+    )
+
+    def __init__(self):
+        self.chests: Dict[str, Chest] = {}
+        self._load_chests_metadata()
+
+        if not self.chests:
+            self._create_initial_chests()
+
+    def _load_chests_metadata(self):
+        """
+        Loads metadata for all chests (their IDs, positions) from a central file.
+        Each chest's inventory is loaded by ChestInventory class itself.
+        """
+        if not os.path.exists(self.CHEST_DATA_FILE):
+            print(f"Chest metadata file not found: {self.CHEST_DATA_FILE}. Will create default chests.")
+            return
+
+        try:
+            with open(self.CHEST_DATA_FILE, 'r') as f:
+                chests_metadata = json.load(f)
+
+            for chest_data in chests_metadata:
+                chest_id = chest_data["chest_id"]
+                x = chest_data["x"]
+                y = chest_data["y"]
+                chest = Chest(chest_id, x, y)
+                self.chests[chest_id] = chest
+                print(f"Loaded chest: {chest_id} at ({x}, {y})")
+        except json.JSONDecodeError as e:
+            print(f"Error decoding chest metadata JSON: {e}. Starting with empty chests.")
+            self.chests = {}
+        except Exception as e:
+            print(f"An unexpected error occurred during chest metadata load: {e}. Starting with empty chests.")
+            self.chests = {}
+
+    def save_chests(self):
+        """
+        Saves metadata for all chests and triggers each chest to save its inventory.
+        """
+        os.makedirs(os.path.dirname(self.CHEST_DATA_FILE), exist_ok=True)
+        
+        chests_metadata = []
+        for chest_id, chest in self.chests.items():
+            chests_metadata.append({
+                "chest_id": chest.chest_id,
+                "x": chest.world_x,
+                "y": chest.world_y
+            })
+            chest.save_state()
+        
+        try:
+            with open(self.CHEST_DATA_FILE, 'w') as f:
+                json.dump(chests_metadata, f, indent=4)
+            print(f"Chest metadata saved to {self.CHEST_DATA_FILE}")
+        except IOError as e:
+            print(f"Error saving chest metadata: {e}")
+
+    def _create_initial_chests(self):
+        """
+        Creates some default chests if no chest data is found.
+        Populates them with some items for testing.
+        """
+        print("Creating initial default chests...")
+
+        SPAWN_X_METERS = 1300
+        SPAWN_Y_METERS = 3300
+        player_spawn_pixel_x = int(SPAWN_X_METERS * Display.PIXELS_PER_METER)
+        player_spawn_pixel_y = int(SPAWN_Y_METERS * Display.PIXELS_PER_METER)
+
+
+        chest1_id = "wooden_chest_001"
+        chest1_x = player_spawn_pixel_x + (2 * Display.TILE_SIZE_PIXELS)
+        chest1_y = player_spawn_pixel_y + (1 * Display.TILE_SIZE_PIXELS)
+        chest1 = Chest(chest1_id, chest1_x, chest1_y)
+        chest1.inventory.add_item(IronSword(), quantity=3)
+        chest1.inventory.add_item(IronSword(name="Polished Iron Sword", value=100, damage=22), quantity=1)
+        self.chests[chest1_id] = chest1
+        
+        chest2_id = "wooden_chest_002"
+        chest2_x = player_spawn_pixel_x - (3 * Display.TILE_SIZE_PIXELS)
+        chest2_y = player_spawn_pixel_y + (2 * Display.TILE_SIZE_PIXELS)
+        chest2 = Chest(chest2_id, chest2_x, chest2_y)
+        self.chests[chest2_id] = chest2
+
+        self.save_chests()
+        print(f"Created {len(self.chests)} initial chests.")
+
+    def update(self, dt: float):
+        """
+        Updates internal state of chests if necessary (e.g., animation).
+        For now, chests are static, so this is a placeholder.
+        """
+        pass
+
+    def draw(self, screen: pygame.Surface, camera_offset_x: float, camera_offset_y: float):
+        """
+        Draws all active chests on the screen.
+        """
+        for chest in self.chests.values():
+            chest.draw(screen, camera_offset_x, camera_offset_y)
+
+    def interact_with_chests(self, mouse_world_x: int, mouse_world_y: int, player) -> Optional[Chest]:
+        """
+        Checks if the mouse click interacted with any chest and if the player is close enough.
+        Returns the interacted chest if successful, otherwise None.
+        """
+        for chest in self.chests.values():
+            chest_rect_world = pygame.Rect(chest.world_x, chest.world_y, chest.width, chest.height)
+            
+            if chest_rect_world.collidepoint(mouse_world_x, mouse_world_y):
+                if chest.is_interactable(player.world_x, player.world_y):
+                    chest.toggle_open()
+                    return chest
+        return None
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+chest_inventory.py
+```
+# engine/world/objects/inventory/chest_inventory.py
+
+import json
+import os
+from typing import List, Dict, Optional
+from engine.items.base_item import BaseItem
+from engine.items.item_registry import get_item_class
+# Assuming IronSword is registered as 'iron_sword_id' when imported
+from engine.items.weapons.swords.iron_sword import IronSword # Needed to ensure its registration
+
+class ChestInventory:
+    """
+    Manages the inventory for a single chest, handling item instances and persistence.
+    Each chest will have its own inventory file based on its unique ID.
+    """
+    MAX_CAPACITY = 15 # Chests might have a different capacity
+
+    def __init__(self, chest_id: str):
+        self.chest_id = chest_id
+        self.items: List[BaseItem] = []
+        # Path modified to ensure it's relative to the main game directory
+        # user_data/chests/{chest_id}_inventory.json
+        game_root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+        self._inventory_file_path = os.path.join(game_root_dir, "user_data", "chests", f"{self.chest_id}_inventory.json")
+        self._load_inventory()
+
+    def _load_inventory(self):
+        """
+        Loads the inventory from the chest's specific JSON file.
+        If the file doesn't exist, initializes an empty inventory.
+        """
+        if not os.path.exists(self._inventory_file_path):
+            print(f"Chest inventory file not found: {self._inventory_file_path}. Initializing empty inventory for chest {self.chest_id}.")
+            self.items = []
+            return
+
+        try:
+            with open(self._inventory_file_path, 'r') as f:
+                serialized_inventory = json.load(f)
+
+            self.items = []
+            for item_data in serialized_inventory:
+                item_id = item_data.get("item_id")
+                current_stack = item_data.get("current_stack", 1)
+
+                item_class = get_item_class(item_id)
+                if item_class:
+                    item_instance = item_class()
+                    item_instance.current_stack = current_stack
+                    self.items.append(item_instance)
+                else:
+                    print(f"Warning: Could not find item class for ID '{item_id}' for chest {self.chest_id} during load.")
+        except json.JSONDecodeError as e:
+            print(f"Error decoding chest inventory JSON for {self.chest_id}: {e}. Starting with empty inventory.")
+            self.items = []
+        except Exception as e:
+            print(f"An unexpected error occurred during chest inventory load for {self.chest_id}: {e}. Starting with empty inventory.")
+            self.items = []
+
+    def save_inventory(self):
+        """
+        Saves the current chest inventory to its specific JSON file.
+        """
+        os.makedirs(os.path.dirname(self._inventory_file_path), exist_ok=True)
+        serialized_inventory = [item.to_dict() for item in self.items]
+        try:
+            with open(self._inventory_file_path, 'w') as f:
+                json.dump(serialized_inventory, f, indent=4)
+            print(f"Chest inventory for {self.chest_id} saved to {self._inventory_file_path}")
+        except IOError as e:
+            print(f"Error saving chest inventory for {self.chest_id}: {e}")
+
+    def add_item(self, item: BaseItem, quantity: int = 1) -> bool:
+        """
+        Adds an item to the chest inventory. Handles stacking.
+        Returns True if item was added, False otherwise.
+        """
+        if quantity <= 0:
+            return False
+
+        if item.stackable:
+            for existing_item in self.items:
+                if existing_item.item_id == item.item_id and existing_item.current_stack < existing_item.max_stack:
+                    space_available = existing_item.max_stack - existing_item.current_stack
+                    amount_to_add = min(quantity, space_available)
+                    existing_item.current_stack += amount_to_add
+                    quantity -= amount_to_add
+                    if quantity == 0:
+                        return True
+
+            while quantity > 0:
+                if len(self.items) >= self.MAX_CAPACITY:
+                    print(f"Chest '{self.chest_id}' full, cannot add all {item.name}. Remaining: {quantity}")
+                    return False
+                
+                item_class = get_item_class(item.item_id)
+                if not item_class:
+                    print(f"Error: Could not find item class for ID '{item.item_id}' when trying to add new stack to chest.")
+                    return False
+                new_stack_item = item_class() # Create a new instance for the new stack
+
+                amount_to_add = min(quantity, new_stack_item.max_stack)
+                new_stack_item.current_stack = amount_to_add
+                self.items.append(new_stack_item)
+                quantity -= amount_to_add
+            return True
+        else: # Non-stackable
+            for _ in range(quantity):
+                if len(self.items) >= self.MAX_CAPACITY:
+                    print(f"Chest '{self.chest_id}' full, cannot add {item.name}.")
+                    return False
+
+                item_class = get_item_class(item.item_id)
+                if not item_class:
+                    print(f"Error: Could not find item class for ID '{item.item_id}' when trying to add non-stackable item to chest.")
+                    return False
+                new_instance = item_class() # Create a new instance for each quantity
+                self.items.append(new_instance)
+            return True
+
+    def remove_item(self, item: BaseItem, quantity: int = 1) -> bool:
+        """
+        Removes an item from the chest inventory. Handles stacking.
+        Returns True if item was removed, False otherwise.
+        """
+        if quantity <= 0:
+            return False
+
+        total_found_quantity = self.get_item_count(item.item_id)
+        if total_found_quantity < quantity:
+            print(f"Not enough {item.name} in chest '{self.chest_id}' to remove {quantity}. Found: {total_found_quantity}")
+            return False
+
+        remaining_to_remove = quantity
+        
+        # Iterate over a copy of the list to allow modification during iteration
+        for existing_item in self.items[:]:
+            if remaining_to_remove <= 0:
+                break
+
+            if existing_item.item_id == item.item_id:
+                if existing_item.current_stack >= remaining_to_remove:
+                    existing_item.current_stack -= remaining_to_remove
+                    remaining_to_remove = 0
+                    if existing_item.current_stack == 0:
+                        self.items.remove(existing_item)
+                else:
+                    remaining_to_remove -= existing_item.current_stack
+                    self.items.remove(existing_item)
+
+        return remaining_to_remove == 0
+
+    def get_items(self) -> List[BaseItem]:
+        """Returns the list of item instances currently in the inventory."""
+        return self.items
+
+    def get_item_count(self, item_id: str) -> int: # FIXED: Removed extra ')'
+        """Returns the total quantity of a specific item_id in the inventory."""
+        count = 0
+        for item in self.items:
+            if item.item_id == item_id:
+                count += item.current_stack
+        return count
+
+    def __len__(self):
+        return len(self.items)
+
+    def __str__(self):
+        if not self.items:
+            return f"Chest ({self.chest_id}): Empty"
+        items_str = ", ".join([f"{item.name} x{item.current_stack}" for item in self.items])
+        return f"Chest ({self.chest_id}): [{items_str}]"
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+player.py
+```
+import pygame
+import os
+from engine.display import Display
+from game_config import PLAYER_SPRITE_SHEET_PATH, PLAYER_SPRITE_DIRECTIONS_ORDER, PLAYER_SWALK_SHEET_PATH 
+from utils.direction import get_direction_from_vector
+import math
+from engine.player.inventory.player_inventory import PlayerInventory
+from typing import Dict, List, Optional, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from engine.world.objects.chest import Chest
+
+class Player:
+    """
+    Represents the player character in the game.
+    """
+
+    DEFAULT_WIDTH = int(1 * Display.PIXELS_PER_METER)
+    DEFAULT_HEIGHT = int(2 * Display.PIXELS_PER_METER)
+
+    DEFAULT_COLOR = (255, 0, 0)
+    DEFAULT_SPEED = 150
+
+    WALK_ANIMATION_FPS = 16
+    
+    TARGET_REACH_TOLERANCE = 10
+
+    def __init__(self, x: float, y: float, width: Optional[int] = None, height: Optional[int] = None, 
+                 color: Optional[tuple] = None, speed: Optional[int] = None):
+        self.world_x: float = float(x)
+        self.world_y: float = float(y)
+
+        self.width: int = width if width is not None else self.DEFAULT_WIDTH
+        self.height: int = height if height is not None else self.DEFAULT_HEIGHT
+        self.color: tuple = color if color is not None else self.DEFAULT_COLOR
+
+        self.speed: int = speed if speed is not None else self.DEFAULT_SPEED 
+
+        self.rect: pygame.Rect = pygame.Rect(0, 0, self.width, self.height)
+
+        self.idle_sprite_sheet: Optional[pygame.Surface] = None
+        self.walk_sprite_sheet: Optional[pygame.Surface] = None
+        self._idle_sprite_rects: Dict[str, pygame.Rect] = {}
+        self._walk_frames_south_rects: List[pygame.Rect] = []
+
+        self.current_direction_key: str = "S"
+
+        self._is_moving: bool = False
+        self._animation_frame_index: int = 0
+        self._animation_timer: float = 0.0
+
+        self.target_x: Optional[float] = None
+        self.target_y: Optional[float] = None
+
+        self._load_sprites()
+
+        self.inventory: PlayerInventory = PlayerInventory()
+
+    def _load_sprites(self):
+        """
+        Loads the player sprite sheets and calculates sub-rectangles for each.
+        """
+        try:
+
+            game_root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+            idle_full_path = os.path.join(game_root_dir, PLAYER_SPRITE_SHEET_PATH)
+            self.idle_sprite_sheet = pygame.image.load(idle_full_path).convert_alpha()
+
+            walk_full_path = os.path.join(game_root_dir, PLAYER_SWALK_SHEET_PATH)
+            self.walk_sprite_sheet = pygame.image.load(walk_full_path).convert_alpha()
+
+            IDLE_SPRITE_SHEET_COLS = 4 
+            IDLE_SPRITE_SHEET_ROWS = 2 
+
+            expected_idle_sheet_width = IDLE_SPRITE_SHEET_COLS * self.width
+            expected_idle_sheet_height = IDLE_SPRITE_SHEET_ROWS * self.height
+
+
+            if self.idle_sprite_sheet and (self.idle_sprite_sheet.get_width() != expected_idle_sheet_width or \
+               self.idle_sprite_sheet.get_height() != expected_idle_sheet_height):
+                print(f"Warning: Idle sheet ({self.idle_sprite_sheet.get_width()}x{self.idle_sprite_sheet.get_height()}) "
+                      f"expected ({expected_idle_sheet_width}x{expected_idle_sheet_height}). Check {PLAYER_SPRITE_SHEET_PATH}")
+            
+            for i, direction_key in enumerate(PLAYER_SPRITE_DIRECTIONS_ORDER):
+                col = i % IDLE_SPRITE_SHEET_COLS 
+                row = i // IDLE_SPRITE_SHEET_COLS 
+
+                x_offset = col * self.width
+                y_offset = row * self.height
+                
+                self._idle_sprite_rects[direction_key] = pygame.Rect(x_offset, y_offset, self.width, self.height)
+
+            if self.walk_sprite_sheet:
+
+                for i in range(IDLE_SPRITE_SHEET_COLS * IDLE_SPRITE_SHEET_ROWS): 
+                    col = i % IDLE_SPRITE_SHEET_COLS
+                    row = i // IDLE_SPRITE_SHEET_COLS
+
+                    x_offset = col * self.width
+                    y_offset = row * self.height
+
+                    self._walk_frames_south_rects.append(pygame.Rect(x_offset, y_offset, self.width, self.height))
+            else:
+                 self._walk_frames_south_rects = []
+
+        except pygame.error as e:
+            print(f"Error loading player sprite sheet: {e}")
+            print(f"Attempted to load from: {idle_full_path} or {walk_full_path}")
+            self.idle_sprite_sheet = None
+            self.walk_sprite_sheet = None
+            self._idle_sprite_rects = {}
+            self._walk_frames_south_rects = []
+            return
+
+    def get_current_sprite(self) -> Optional[pygame.Surface]:
+        """
+        Returns the current Pygame Surface of the player's sprite or animation frame.
+        Useful for displaying in UI.
+        """
+        if self._is_moving and self.current_direction_key == "S" and self.walk_sprite_sheet and self._walk_frames_south_rects:
+            frame_rect = self._walk_frames_south_rects[self._animation_frame_index]
+            return self.walk_sprite_sheet.subsurface(frame_rect)
+        elif self.idle_sprite_sheet and self.current_direction_key in self._idle_sprite_rects:
+            sprite_rect = self._idle_sprite_rects[self.current_direction_key]
+            return self.idle_sprite_sheet.subsurface(sprite_rect)
+        return None
+
+    def set_target(self, x: float, y: float):
+        self.target_x = float(x)
+        self.target_y = float(y)
+
+    def move(self, keyboard_dx: float, keyboard_dy: float, dt: float, static_colliders: Optional[List[pygame.Rect]] = None):
+        """
+        Updates the player's world position based on keyboard input or auto-movement target.
+        Keyboard input takes precedence.
+        :param static_colliders: A list of pygame.Rect objects representing impassable static objects.
+        """
+
+        effective_dx, effective_dy = keyboard_dx, keyboard_dy
+        
+        distance_to_target: Optional[float] = None 
+
+        if effective_dx == 0 and effective_dy == 0 and self.target_x is not None and self.target_y is not None:
+
+            vec_x = self.target_x - self.world_x
+            vec_y = self.target_y - self.world_y
+
+            distance_to_target = math.hypot(vec_x, vec_y)
+
+            if distance_to_target < self.TARGET_REACH_TOLERANCE:
+
+                self.world_x = self.target_x
+                self.world_y = self.target_y
+                self.target_x = None
+                self.target_y = None
+                self._is_moving = False
+                return
+
+            if distance_to_target > 0:
+                effective_dx = vec_x / distance_to_target
+                effective_dy = vec_y / distance_to_target
+            else:
+                effective_dx, effective_dy = 0, 0
+                
+        else:
+            self.target_x = None
+            self.target_y = None
+
+        if effective_dx != 0 or effective_dy != 0:
+            self._is_moving = True
+            
+            magnitude = math.hypot(effective_dx, effective_dy)
+            if magnitude > 0:
+                normalized_dx = effective_dx / magnitude
+                normalized_dy = effective_dy / magnitude
+            else:
+                normalized_dx = 0
+                normalized_dy = 0
+
+            if keyboard_dx != 0 or keyboard_dy != 0:
+                self.current_direction_key = get_direction_from_vector(keyboard_dx, keyboard_dy, self.current_direction_key)
+            elif self.target_x is not None:
+                dir_x = 0
+                if normalized_dx > 0.5: dir_x = 1
+                elif normalized_dx < -0.5: dir_x = -1
+
+                dir_y = 0
+                if normalized_dy > 0.5: dir_y = 1
+                elif normalized_dy < -0.5: dir_y = -1
+                
+                if dir_x != 0 or dir_y != 0:
+                    self.current_direction_key = get_direction_from_vector(dir_x, dir_y, self.current_direction_key)
+
+            potential_new_world_x = self.world_x + normalized_dx * self.speed * dt
+            potential_new_world_y = self.world_y + normalized_dy * self.speed * dt
+
+            player_future_rect_x = pygame.Rect(potential_new_world_x, self.world_y, self.width, self.height)
+            player_future_rect_y = pygame.Rect(self.world_x, potential_new_world_y, self.width, self.height)
+            
+            if static_colliders:
+
+                for collider_rect in static_colliders:
+                    if player_future_rect_x.colliderect(collider_rect):
+                        if normalized_dx > 0:
+                            potential_new_world_x = collider_rect.left - self.width
+                        elif normalized_dx < 0:
+                            potential_new_world_x = collider_rect.right
+
+                        player_future_rect_y = pygame.Rect(potential_new_world_x, potential_new_world_y, self.width, self.height)
+                        break 
+                
+                for collider_rect in static_colliders:
+                    if player_future_rect_y.colliderect(collider_rect):
+                        if normalized_dy > 0:
+                            potential_new_world_y = collider_rect.top - self.height
+                        elif normalized_dy < 0:
+                            potential_new_world_y = collider_rect.bottom
+                        break
+
+            if self.target_x is not None and self.target_y is not None and distance_to_target is not None:
+                current_vec_x = self.target_x - self.world_x
+                current_vec_y = self.target_y - self.world_y
+                
+                if (current_vec_x * (self.target_x - potential_new_world_x)) < 0:
+                    potential_new_world_x = self.target_x
+                if (current_vec_y * (self.target_y - potential_new_world_y)) < 0:
+                    potential_new_world_y = self.target_y
+                
+                new_distance_to_target = math.hypot(self.target_x - potential_new_world_x, self.target_y - potential_new_world_y)
+                if new_distance_to_target < self.TARGET_REACH_TOLERANCE:
+                    self.world_x = self.target_x
+                    self.world_y = self.target_y
+                    self.target_x = None
+                    self.target_y = None
+                    self._is_moving = False
+                    return
+
+            self.world_x = potential_new_world_x
+            self.world_y = potential_new_world_y
+            
+        else:
+            self._is_moving = False
+            self.target_x = None
+
+    def update(self, dt: float):
+        """
+        Updates the player's animation state based on delta time.
+        """
+        if self._is_moving:
+
+            if self.current_direction_key == "S" and self.walk_sprite_sheet and self._walk_frames_south_rects:
+                self._animation_timer += dt
+                if self._animation_timer >= 1.0 / self.WALK_ANIMATION_FPS:
+                    self._animation_frame_index = (self._animation_frame_index + 1) % len(self._walk_frames_south_rects)
+                    self._animation_timer = 0.0
+            else:
+                self._animation_frame_index = 0
+                self._animation_timer = 0.0
+        else:
+            self._animation_frame_index = 0
+            self._animation_timer = 0.0
+
+    def draw(self, screen: pygame.Surface, camera_offset_x: float, camera_offset_y: float):
+        """
+        Draws the player on the given screen surface, using the appropriate sprite or animation frame.
+        Applies camera offset to draw player at correct screen position.
+        """
+        screen_x = self.world_x - camera_offset_x
+        screen_y = self.world_y - camera_offset_y
+
+        self.rect.topleft = (int(screen_x), int(screen_y))
+
+        current_sprite_surface = self.get_current_sprite()
+        
+        if current_sprite_surface:
+            screen.blit(current_sprite_surface, self.rect)
+        else:
+
+            pygame.draw.rect(screen, self.color, self.rect)
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+player_inventory.py
+```
+import json
+import os
+from typing import List, Dict, Optional
+from engine.items.base_item import BaseItem
+from engine.items.item_registry import get_item_class
+from engine.items.weapons.swords.iron_sword import IronSword 
+
+class PlayerInventory:
+    """
+    Manages the player's inventory, holding item instances in memory
+    and handling persistence to/from a JSON file.
+    """
+    GAME_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    SAVE_DIR = os.path.join(GAME_ROOT_DIR, "user_data", "player")
+    INVENTORY_FILE = os.path.join(SAVE_DIR, "inventory_content.json")
+
+    MAX_CAPACITY = 20
+
+    def __init__(self):
+        self.items: List[BaseItem] = []
+        self._load_inventory()
+
+    def _load_inventory(self):
+        """
+        Loads the inventory from the JSON file.
+        If the file doesn't exist, initializes an empty inventory.
+        """
+        os.makedirs(self.SAVE_DIR, exist_ok=True)
+        
+        if not os.path.exists(self.INVENTORY_FILE):
+            print(f"Inventory file not found: {self.INVENTORY_FILE}. Initializing empty inventory.")
+            self.items = []
+            return
+
+        try:
+            with open(self.INVENTORY_FILE, 'r') as f:
+                serialized_inventory = json.load(f)
+
+            self.items = []
+            for item_data in serialized_inventory:
+                item_id = item_data.get("item_id")
+                current_stack = item_data.get("current_stack", 1)
+
+                item_class = get_item_class(item_id)
+                if item_class:
+                    item_instance = item_class()
+                    item_instance.current_stack = current_stack
+                    self.items.append(item_instance)
+                else:
+                    print(f"Warning: Could not find item class for ID '{item_id}' during load. Item skipped.")
+        except json.JSONDecodeError as e:
+            print(f"Error decoding inventory JSON: {e}. Starting with empty inventory.")
+            self.items = []
+        except Exception as e:
+            print(f"An unexpected error occurred during inventory load: {e}. Starting with empty inventory.")
+            self.items = []
+
+    def save_inventory(self):
+        """
+        Saves the current inventory to the JSON file.
+        """
+        os.makedirs(self.SAVE_DIR, exist_ok=True)
+        serialized_inventory = [item.to_dict() for item in self.items]
+        try:
+            with open(self.INVENTORY_FILE, 'w') as f:
+                json.dump(serialized_inventory, f, indent=4)
+            print(f"Inventory saved to {self.INVENTORY_FILE}")
+        except IOError as e:
+            print(f"Error saving inventory: {e}")
+
+    def add_item(self, item: BaseItem, quantity: int = 1) -> bool:
+        """
+        Adds an item to the inventory. Handles stacking if the item is stackable.
+        Returns True if item was added, False otherwise (e.g., inventory full).
+        """
+        if quantity <= 0:
+            return False
+
+        if item.stackable:
+            for existing_item in self.items:
+                if existing_item.item_id == item.item_id and existing_item.current_stack < existing_item.max_stack:
+                    space_available = existing_item.max_stack - existing_item.current_stack
+                    amount_to_add = min(quantity, space_available)
+                    existing_item.current_stack += amount_to_add
+                    quantity -= amount_to_add
+                    if quantity == 0:
+                        return True
+
+            while quantity > 0:
+                if len(self.items) >= self.MAX_CAPACITY:
+                    print(f"Inventory full, cannot add all {item.name}. Remaining: {quantity}")
+                    return False
+                
+                item_class = get_item_class(item.item_id)
+                if not item_class:
+                    print(f"Error: Could not find item class for ID '{item.item_id}' when trying to add new stack. Item not added.")
+                    return False
+                new_stack_item = item_class()
+
+                amount_to_add = min(quantity, new_stack_item.max_stack)
+                new_stack_item.current_stack = amount_to_add
+                self.items.append(new_stack_item)
+                quantity -= amount_to_add
+            return True
+        else:
+            for _ in range(quantity):
+                if len(self.items) >= self.MAX_CAPACITY:
+                    print(f"Inventory full, cannot add {item.name}.")
+                    return False
+
+                item_class = get_item_class(item.item_id)
+                if not item_class:
+                    print(f"Error: Could not find item class for ID '{item.item_id}' when trying to add non-stackable item. Item not added.")
+                    return False
+                new_instance = item_class()
+
+                self.items.append(new_instance)
+            return True
+
+    def remove_item(self, item: BaseItem, quantity: int = 1) -> bool:
+        """
+        Removes an item from the inventory. Handles stacking.
+        Returns True if item was removed, False otherwise (e.g., not enough quantity).
+        """
+        if quantity <= 0:
+            return False
+
+        total_found_quantity = self.get_item_count(item.item_id)
+        if total_found_quantity < quantity:
+            print(f"Not enough {item.name} in inventory to remove {quantity}. Found: {total_found_quantity}")
+            return False
+
+        remaining_to_remove = quantity
+        
+        for existing_item in self.items[:]:
+            if remaining_to_remove <= 0:
+                break
+
+            if existing_item.item_id == item.item_id:
+                if existing_item.current_stack >= remaining_to_remove:
+                    existing_item.current_stack -= remaining_to_remove
+                    remaining_to_remove = 0
+                    if existing_item.current_stack == 0:
+                        self.items.remove(existing_item)
+                else:
+                    remaining_to_remove -= existing_item.current_stack
+                    self.items.remove(existing_item)
+
+        return remaining_to_remove == 0
+
+    def get_items(self) -> List[BaseItem]:
+        """Returns the list of item instances currently in the inventory."""
+        return self.items
+
+    def get_item_count(self, item_id: str) -> int:
+        """Returns the total quantity of a specific item_id in the inventory."""
+        count = 0
+        for item in self.items:
+            if item.item_id == item_id:
+                count += item.current_stack
+        return count
+
+    def __len__(self):
+        return len(self.items)
+
+    def __str__(self):
+        if not self.items:
+            return "Inventory: Empty"
+        items_str = ", ".join([f"{item.name} x{item.current_stack}" for item in self.items])
+        return f"Inventory: [{items_str}]"
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+npc.py
+```
+import pygame
+import os
+import math
+from engine.display import Display
+from game_config import PLAYER_SPRITE_DIRECTIONS_ORDER
+from utils.direction import get_direction_from_vector
+from engine.npc.npc_race import RACE_REGISTRY
+
+class NPC(pygame.sprite.Sprite):
+    """
+    Base class for all Non-Player Characters (NPCs).
+    """
+
+    IDLE_SPRITE_SHEET_COLS = 4
+    IDLE_SPRITE_SHEET_ROWS = 2
+
+    def __init__(self, x_world, y_world, race_key, name="Unnamed NPC"):
+        super().__init__()
+
+        self.world_x = float(x_world)
+        self.world_y = float(y_world)
+
+        self.name = name
+
+        self.race = RACE_REGISTRY.get(race_key.lower())
+        if not self.race:
+            raise ValueError(f"Unknown race_key: {race_key}. Must be in {list(RACE_REGISTRY.keys())}")
+
+        self.width = self.race.default_width_pixels
+        self.height = self.race.default_height_pixels
+        self.speed = self.race.default_speed_pixels_per_sec
+        self.color = self.race.default_color
+
+        print(f"DEBUG NPC Init: '{self.name}' (Race: {self.race.name}) initialized with:")
+        print(f"  - Speed: {self.speed} px/s")
+        print(f"  - Dimensions: {self.width}x{self.height} px")
+
+        self.idle_sprite_sheet = None
+        self._idle_sprite_rects = {}
+        self.current_direction_key = "S"
+
+        self.image = pygame.Surface([self.width, self.height], pygame.SRCALPHA)
+        self.image.fill(self.color)
+        self.rect = self.image.get_rect(topleft=(int(self.world_x), int(self.world_y)))
+
+        self._is_moving = False
+        self._animation_frame_index = 0
+        self._animation_timer = 0.0
+
+        self.target_x = None
+        self.target_y = None
+        self.TARGET_REACH_TOLERANCE = 10
+
+        self._load_sprites()
+
+    def _load_sprites(self):
+        """
+        Loads the NPC idle sprite sheet and calculates sub-rectangles for each direction.
+        If loading fails, self.image remains the colored rectangle.
+        """
+        game_root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        if not self.race or not self.race.idle_sprite_sheet_path:
+            print(f"Warning: No idle sprite sheet path defined for race {self.race.name if self.race else 'UNKNOWN'}.")
+            self.image.fill(self.color)
+            self.idle_sprite_sheet = None
+            return
+
+        sprite_full_path = os.path.join(game_root_dir, self.race.idle_sprite_sheet_path)
+
+        if not os.path.exists(sprite_full_path):
+            print(f"Error: NPC sprite sheet not found at {sprite_full_path} for {self.name} ({self.race.name}). Falling back to colored rect.")
+            self.image.fill(self.color)
+            self.idle_sprite_sheet = None
+            return
+
+        try:
+            self.idle_sprite_sheet = pygame.image.load(sprite_full_path).convert_alpha()
+
+            expected_sheet_width = self.IDLE_SPRITE_SHEET_COLS * self.width
+            expected_sheet_height = self.IDLE_SPRITE_SHEET_ROWS * self.height
+
+            if self.idle_sprite_sheet.get_width() != expected_sheet_width or \
+               self.idle_sprite_sheet.get_height() != expected_sheet_height:
+                print(f"Warning: {self.race.name} idle sheet ({self.idle_sprite_sheet.get_width()}x{self.idle_sprite_sheet.get_height()}) "
+                      f"expected ({expected_sheet_width}x{expected_sheet_height}). Check {self.race.idle_sprite_sheet_path}. Falling back to colored rect.")
+                self.image.fill(self.color)
+                self.idle_sprite_sheet = None
+                return
+
+            if self.IDLE_SPRITE_SHEET_COLS * self.IDLE_SPRITE_SHEET_ROWS < len(PLAYER_SPRITE_DIRECTIONS_ORDER):
+                print(f"Warning: NPC idle sheet frames ({self.IDLE_SPRITE_SHEET_COLS*self.IDLE_SPRITE_SHEET_ROWS}) "
+                      f"are fewer than primary directions ({len(PLAYER_SPRITE_DIRECTIONS_ORDER)}). Some directions may not have a distinct frame. Check sheet or config.")
+            elif self.IDLE_SPRITE_SHEET_COLS * self.IDLE_SPRITE_SHEET_ROWS > len(PLAYER_SPRITE_DIRECTIONS_ORDER):
+                print(f"Warning: NPC idle sheet frames ({self.IDLE_SPRITE_SHEET_COLS*self.IDLE_SPRITE_SHEET_ROWS}) "
+                      f"are more than primary directions ({len(PLAYER_SPRITE_DIRECTIONS_ORDER)}). Redundant frames may exist. Check sheet or config.")
+
+            for i, direction_key in enumerate(PLAYER_SPRITE_DIRECTIONS_ORDER):
+                if i < self.IDLE_SPRITE_SHEET_COLS * self.IDLE_SPRITE_SHEET_ROWS:
+                    col = i % self.IDLE_SPRITE_SHEET_COLS
+                    row = i // self.IDLE_SPRITE_SHEET_COLS
+                    x_offset = col * self.width
+                    y_offset = row * self.height
+                    self._idle_sprite_rects[direction_key] = pygame.Rect(x_offset, y_offset, self.width, self.height)
+                else:
+                    self._idle_sprite_rects[direction_key] = self._idle_sprite_rects.get("S")
+
+            if "S" in self._idle_sprite_rects:
+                self.image = self.idle_sprite_sheet.subsurface(self._idle_sprite_rects["S"])
+            elif self._idle_sprite_rects:
+                self.image = self.idle_sprite_sheet.subsurface(list(self._idle_sprite_rects.values())[0])
+            else:
+                print(f"Warning: No valid sprite rects generated for {self.name}. Falling back to colored rect.")
+                self.image.fill(self.color)
+
+
+        except pygame.error as e:
+            print(f"Error loading NPC sprite sheet for {self.name} ({self.race.name}): {e}")
+            print(f"Attempted to load from: {sprite_full_path}. Falling back to colored rect.")
+            self.idle_sprite_sheet = None
+            self.image.fill(self.color)
+    def set_target(self, x, y):
+        """Sets a target for the NPC to move towards."""
+        self.target_x = float(x)
+        self.target_y = float(y)
+
+    def move(self, dt):
+        """
+        Updates the NPC's world position based on its target.
+        This provides basic auto-movement behavior.
+        """
+        if self.target_x is None or self.target_y is None:
+            self._is_moving = False
+            if self.idle_sprite_sheet and self.current_direction_key in self._idle_sprite_rects:
+                self.image = self.idle_sprite_sheet.subsurface(self._idle_sprite_rects[self.current_direction_key])
+            return
+
+        vec_x = self.target_x - self.world_x
+        vec_y = self.target_y - self.world_y
+
+        distance_to_target = math.hypot(vec_x, vec_y)
+
+        if distance_to_target < self.TARGET_REACH_TOLERANCE:
+            self.world_x = self.target_x
+            self.world_y = self.target_y
+            self.target_x = None
+            self.target_y = None
+            self._is_moving = False
+            if self.idle_sprite_sheet and self.current_direction_key in self._idle_sprite_rects:
+                self.image = self.idle_sprite_sheet.subsurface(self._idle_sprite_rects[self.current_direction_key])
+            return
+
+        self._is_moving = True
+
+        if distance_to_target > 0:
+            normalized_dx = vec_x / distance_to_target
+            normalized_dy = vec_y / distance_to_target
+        else:
+            normalized_dx = 0
+            normalized_dy = 0
+            self._is_moving = False
+            return
+
+        dir_x_int = 0
+        if normalized_dx > 0.5: dir_x_int = 1
+        elif normalized_dx < -0.5: dir_x_int = -1
+
+        dir_y_int = 0
+        if normalized_dy > 0.5: dir_y_int = 1
+        elif normalized_dy < -0.5: dir_y_int = -1
+        
+        if dir_x_int != 0 or dir_y_int != 0:
+            self.current_direction_key = get_direction_from_vector(dir_x_int, dir_y_int, self.current_direction_key)
+        
+        if self.idle_sprite_sheet and self.current_direction_key in self._idle_sprite_rects:
+            self.image = self.idle_sprite_sheet.subsurface(self._idle_sprite_rects[self.current_direction_key])
+
+        delta_x = normalized_dx * self.speed * dt
+        delta_y = normalized_dy * self.speed * dt
+
+        if (delta_x > 0 and self.world_x + delta_x > self.target_x) or \
+           (delta_x < 0 and self.world_x + delta_x < self.target_x):
+            self.world_x = self.target_x
+            delta_x = 0
+
+        if (delta_y > 0 and self.world_y + delta_y > self.target_y) or \
+           (delta_y < 0 and self.world_y + delta_y < self.target_y):
+            self.world_y = self.target_y
+            delta_y = 0
+
+        self.world_x += delta_x
+        self.world_y += delta_y
+
+        if abs(self.world_x - self.target_x) < self.TARGET_REACH_TOLERANCE and \
+           abs(self.world_y - self.target_y) < self.TARGET_REACH_TOLERANCE:
+            self.world_x = self.target_x
+            self.world_y = self.target_y
+            self.target_x = None
+            self.target_y = None
+            self._is_moving = False
+            if self.idle_sprite_sheet and self.current_direction_key in self._idle_sprite_rects:
+                self.image = self.idle_sprite_sheet.subsurface(self._idle_sprite_rects[self.current_direction_key])
+
+
+    def update(self, dt):
+        """
+        Updates the NPC's state, including movement.
+        """
+        self.move(dt)
+    def draw(self, screen, camera_offset_x, camera_offset_y):
+        """
+        Draws the NPC on the screen, applying camera offset.
+        NOTE: Pygame sprite groups handle blitting self.image at self.rect.
+        """
+        screen_x = int(self.world_x - camera_offset_x)
+        screen_y = int(self.world_y - camera_offset_y)
+
+        self.rect.topleft = (screen_x, screen_y)
+        
+        if self.image:
+            screen.blit(self.image, self.rect)
+        else:
+            print(f"DEBUG NPC.draw: Warning, self.image is None for {self.name}. Drawing fallback rectangle.")
+            fallback_rect = pygame.Rect(screen_x, screen_y, self.width, self.height)
+            pygame.draw.rect(screen, (255, 0, 255), fallback_rect, 1)
+            pygame.draw.rect(screen, self.color, fallback_rect, 0)
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+npc_race.py
+```
+from engine.display import Display
+from game_config import NPC_HUMAN_IDLE_SHEET_PATH, NPC_ELF_IDLE_SHEET_PATH
+
+class BaseRace:
+    """Base class for all NPC races."""
+    def __init__(self, name, description, default_width_pixels, default_height_pixels, default_speed_pixels_per_sec, default_color, idle_sprite_sheet_path):
+        self.name = name
+        self.description = description
+        self.default_width_pixels = default_width_pixels
+        self.default_height_pixels = default_height_pixels
+        self.default_speed_pixels_per_sec = default_speed_pixels_per_sec
+        self.default_color = default_color
+        self.idle_sprite_sheet_path = idle_sprite_sheet_path
+
+class HumanRace(BaseRace):
+    """Defines characteristics for the Human race."""
+    def __init__(self):
+        width_in_meters = 1.0
+        height_in_meters = 2.0
+        
+        speed_in_meters_per_sec = 1.5
+        
+        pixels_per_meter = Display.PIXELS_PER_METER if hasattr(Display, 'PIXELS_PER_METER') and Display.PIXELS_PER_METER != 0 else 32 
+
+        calculated_width_pixels = int(width_in_meters * pixels_per_meter)
+        calculated_height_pixels = int(height_in_meters * pixels_per_meter)
+        calculated_speed_pixels = int(speed_in_meters_per_sec * pixels_per_meter) 
+
+        super().__init__(
+            name="Human",
+            description="A common human.",
+            default_width_pixels=calculated_width_pixels,
+            default_height_pixels=calculated_height_pixels,
+            default_speed_pixels_per_sec=calculated_speed_pixels, 
+            default_color=(0, 200, 0),
+            idle_sprite_sheet_path=NPC_HUMAN_IDLE_SHEET_PATH
+        )
+
+class ElfRace(BaseRace):
+    """Defines characteristics for the Elf race."""
+    def __init__(self):
+        width_in_meters = 1.0
+        height_in_meters = 2.0
+        
+        speed_in_meters_per_sec = 1.8 
+
+        pixels_per_meter = Display.PIXELS_PER_METER if hasattr(Display, 'PIXELS_PER_METER') and Display.PIXELS_PER_METER != 0 else 32
+
+        calculated_width_pixels = int(width_in_meters * pixels_per_meter)
+        calculated_height_pixels = int(height_in_meters * pixels_per_meter)
+        calculated_speed_pixels = int(speed_in_meters_per_sec * pixels_per_meter)
+
+        super().__init__(
+            name="Elf",
+            description="A graceful elf, identical to humans for now.",
+            default_width_pixels=calculated_width_pixels,
+            default_height_pixels=calculated_height_pixels,
+            default_speed_pixels_per_sec=calculated_speed_pixels,
+            default_color=(0, 0, 200),
+            idle_sprite_sheet_path=NPC_ELF_IDLE_SHEET_PATH
+        )
+
+RACE_REGISTRY = {
+    "human": HumanRace(),
+    "elf": ElfRace()
+}
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+npc_manager.py
+```
+import pygame
+from engine.npc.npc import NPC
+import random
+from engine.display import Display
+
+class NPCManager:
+    """
+    Manages all NPCs in the game world.
+    """
+    def __init__(self):
+        self.active_npcs = pygame.sprite.Group()
+
+        SPAWN_X_METERS = 1300
+        SPAWN_Y_METERS = 3300
+
+        if Display.PIXELS_PER_METER == 0:
+            print("WARNING: Display.PIXELS_PER_METER is 0 in NPCManager. This indicates an initialization order issue.")
+            player_spawn_pixel_x = int(SPAWN_X_METERS * 32)
+            player_spawn_pixel_y = int(SPAWN_Y_METERS * 32)
+        else:
+            player_spawn_pixel_x = int(SPAWN_X_METERS * Display.PIXELS_PER_METER)
+            player_spawn_pixel_y = int(SPAWN_Y_METERS * Display.PIXELS_PER_METER)
+
+        print(f"DEBUG NPCManager: Player reference spawn (pixel): X={player_spawn_pixel_x}, Y={player_spawn_pixel_y}")
+
+        human_spawn_x = float(player_spawn_pixel_x - (2 * Display.PIXELS_PER_METER))
+        human_spawn_y = float(player_spawn_pixel_y - (1 * Display.PIXELS_PER_METER))
+        human_npc = NPC(x_world=human_spawn_x, y_world=human_spawn_y, race_key="human", name="Villager Alex")
+
+        human_npc.set_target(human_spawn_x + 50.0, human_spawn_y + 50.0) 
+        self.active_npcs.add(human_npc)
+        print(f"DEBUG NPCManager: Added Human NPC '{human_npc.name}' at world ({human_npc.world_x}, {human_npc.world_y})")
+
+        elf_spawn_x = float(player_spawn_pixel_x + (2 * Display.PIXELS_PER_METER))
+        elf_spawn_y = float(player_spawn_pixel_y + (1 * Display.PIXELS_PER_METER))
+        elf_npc = NPC(x_world=elf_spawn_x, y_world=elf_spawn_y, race_key="elf", name="Elara Whisperwind")
+
+        elf_npc.set_target(elf_spawn_x - 50.0, elf_spawn_y - 50.0)
+        self.active_npcs.add(elf_npc)
+        print(f"DEBUG NPCManager: Added Elf NPC '{elf_npc.name}' at world ({elf_npc.world_x}, {elf_npc.world_y})")
+
+    def update(self, dt):
+        """
+        Updates all active NPCs.
+        """
+        for npc in self.active_npcs:
+            if npc.target_x is None:
+                new_target_x = float(npc.world_x + random.randint(-150, 150))
+                new_target_y = float(npc.world_y + random.randint(-150, 150))
+                npc.set_target(new_target_x, new_target_y)
+        
+        self.active_npcs.update(dt) 
+
+    def draw(self, screen, camera_offset_x, camera_offset_y):
+        """
+        Draws all active NPCs on the screen.
+        """
+
+        for npc in self.active_npcs:
+            npc.draw(screen, camera_offset_x, camera_offset_y)
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+item_registry.py
+```
+from typing import Type, Dict, Any
+
+ITEM_REGISTRY: Dict[str, Type[Any]] = {}
+
+def register_item(item_class: Type[Any]):
+    """
+    Decorator to register an item class with the global ITEM_REGISTRY.
+    The item's unique identifier (ITEM_ID) must be defined as a class attribute
+    within the item class itself.
+    """
+
+    item_id = getattr(item_class, 'ITEM_ID', None) 
+
+    if item_id and isinstance(item_id, str):
+        if item_id in ITEM_REGISTRY:
+            print(f"Warning: Duplicate item_id '{item_id}' registered. Overwriting with {item_class.__name__}")
+        ITEM_REGISTRY[item_id] = item_class
+
+    else:
+        print(f"Warning: Item class {item_class.__name__} has no valid 'ITEM_ID' (must be a non-empty string) class attribute. Not registered.")
+    return item_class
+
+def get_item_class(item_id: str) -> Type[Any] | None:
+    """
+    Retrieves an item class from the registry by its item_id.
+    Returns the class object if found, otherwise None.
+    """
+    return ITEM_REGISTRY.get(item_id)
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+base_item.py
+```
+import pygame
+import os
+from typing import Optional
+
+class BaseItem:
+    """
+    Base class for all items in the game. Defines common properties and behaviors.
+    """
+    def __init__(self, item_id: str, name: str, description: str, value: int, 
+                 sprite_path: Optional[str] = None,
+                 stackable: bool = True, max_stack: int = 1):
+        self.item_id = item_id
+        self.name = name
+        self.description = description
+        self.value = value
+        self.stackable = stackable
+        self.max_stack = max_stack if stackable else 1
+        self.current_stack = 1
+        self._sprite: Optional[pygame.Surface] = None
+        self._sprite_path: Optional[str] = sprite_path
+
+        if self._sprite_path:
+            self._load_sprite()
+
+    def _load_sprite(self):
+        """Loads the item's sprite image."""
+        try:
+            game_root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            
+            if self._sprite_path is None:
+                print(f"Error: _sprite_path is None for item {self.name} in _load_sprite().")
+                self._sprite = None
+                return
+
+            full_sprite_path = os.path.join(game_root_dir, self._sprite_path)
+
+            if not os.path.exists(full_sprite_path):
+                print(f"Warning: Item sprite not found at {full_sprite_path} for item {self.name}. Using default placeholder.")
+                self._sprite = None
+                return
+
+            self._sprite = pygame.image.load(full_sprite_path).convert_alpha()
+        except pygame.error as e:
+            print(f"Error loading sprite for {self.name}: {e}. Path: {self._sprite_path}. Using default placeholder.")
+            self._sprite = None
+
+    def get_sprite(self) -> pygame.Surface:
+        """Returns the Pygame Surface for the item's sprite."""
+        if self._sprite:
+            return self._sprite
+
+        placeholder_size = 32
+        placeholder_surface = pygame.Surface((placeholder_size, placeholder_size), pygame.SRCALPHA)
+        placeholder_surface.fill((255, 0, 255, 128))
+        pygame.draw.rect(placeholder_surface, (0, 0, 0), (0, 0, placeholder_size, placeholder_size), 1)
+        return placeholder_surface
+
+    def to_dict(self) -> dict:
+        """
+        Converts the item's essential properties into a dictionary for serialization.
+        This only includes what's needed to recreate the item later.
+        """
+        return {
+            "item_id": self.item_id,
+            "current_stack": self.current_stack
+        }
+
+    def use(self, player):
+        """
+        Default use method. Override in subclasses for specific item effects.
+        """
+        print(f"Using {self.name}...")
+        
+    def __repr__(self):
+        return f"{self.name} (ID: {self.item_id}, x{self.current_stack})"
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+iron_sword.py
+```
+from engine.items.base_item import BaseItem
+from engine.items.item_registry import register_item
+import os
+from typing import Optional
+
+@register_item
+class IronSword(BaseItem):
+    ITEM_ID = "iron_sword"
+
+    def __init__(self, 
+                 name: str = "Iron Sword", 
+                 description: str = "A robust sword crafted from iron. Suitable for basic combat.",
+                 value: int = 50,
+                 damage: int = 10,
+
+                 sprite_path: Optional[str] = None
+                ):
+        
+        default_sprite_path = os.path.join("av", "sprites", "items", "weapons", "iron_sword.png")
+        final_sprite_path = sprite_path if sprite_path is not None else default_sprite_path
+
+        super().__init__(
+            item_id=IronSword.ITEM_ID,
+            name=name,
+            description=description,
+            value=value,
+            sprite_path=final_sprite_path,
+            stackable=False,
+            max_stack=1
+        )
+        
+        self.damage = damage
+
+    def inspect(self):
+        """
+        Custom method to display sword-specific details.
+        """
+        print(f"--- {self.name} ---")
+        print(f"Description: {self.description}")
+        print(f"Value: {self.value} gold")
+        print(f"Damage: {self.damage}")
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+river.py
+```
+from engine.world.tile import Tile
+import random
+
+class RiverBiome:
+    """
+    A biome generator for river areas. (Can be integrated within other biomes later)
+    """
+    def __init__(self):
+        self.river_water_colors = [
+            (30, 120, 170),
+            (25, 110, 160)
+        ]
+        self.riverbank_colors = [
+            (150, 130, 90),
+            (160, 140, 100)
+        ]
+    
+    def generate_tile(self, global_tile_x, global_tile_y):
+        """
+        Generates a Tile object for the given global tile coordinates within the River biome.
+        Simple alternating pattern for water and bank for now.
+        """
+        if (global_tile_x % 3 == 0) or (global_tile_y % 3 == 0):
+            color = random.choice(self.river_water_colors)
+            return Tile("river_water", color)
+        else:
+            color = random.choice(self.riverbank_colors)
+            return Tile("river_bank", color)
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+ocean.py
+```
+from engine.world.tile import Tile
+import random
+
+class OceanBiome:
+    """
+    A biome generator for ocean areas.
+    """
+    def __init__(self):
+        self.deep_water_colors = [
+            (0, 70, 120),
+            (0, 60, 100),
+            (0, 80, 140)
+        ]
+
+    def generate_tile(self, global_tile_x, global_tile_y):
+        """
+        Generates a Tile object for the given global tile coordinates within the Ocean biome.
+        """
+        color = random.choice(self.deep_water_colors)
+        return Tile("deep_ocean", color)
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+mountain.py
+```
+from engine.world.tile import Tile
+import random
+
+class MountainBiome:
+    """
+    A biome generator for mountain areas.
+    """
+    def __init__(self):
+
+        self.rock_colors = [
+            (100, 100, 100),
+            (120, 120, 120),
+            (140, 140, 140),
+            (110, 105, 100)
+        ]
+
+        self.snow_colors = [
+            (240, 240, 240),
+            (220, 220, 220)
+        ]
+
+        self.sparse_ground_colors = [
+            (80, 70, 60),
+            (90, 80, 70)
+        ]
+
+    def generate_tile(self, global_tile_x, global_tile_y):
+        """
+        Generates a Tile object for the given global tile coordinates within the Mountain biome.
+        Mixes rocky terrain with occasional snow patches and sparse ground.
+        """
+        rnd = random.Random(global_tile_x * 1000 + global_tile_y * 1000)
+        choice_val = rnd.random()
+
+        if choice_val < 0.7:
+            color = random.choice(self.rock_colors)
+            return Tile("mountain_rock", color)
+        elif choice_val < 0.85:
+            color = random.choice(self.sparse_ground_colors)
+            return Tile("mountain_sparse_ground", color)
+        else:
+            color = random.choice(self.snow_colors)
+            return Tile("mountain_snow_patch", color)
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+forest.py
+```
+from engine.world.tile import Tile
+import random
+
+class ForestBiome:
+    """
+    A biome generator for forest areas.
+    """
+    def __init__(self):
+        self.forest_floor_colors = [
+            (30, 90, 30),
+            (40, 100, 40),
+            (50, 110, 50)
+        ]
+        self.tree_colors = [
+            (0, 50, 0),
+            (0, 60, 0)
+        ]
+
+    def generate_tile(self, global_tile_x, global_tile_y):
+        """
+        Generates a Tile object for the given global tile coordinates within the Forest biome.
+        """
+        if (global_tile_x % 3 == 0 and global_tile_y % 3 == 0) or \
+           ((global_tile_x + 1) % 3 == 0 and (global_tile_y + 1) % 3 == 0):
+            color = random.choice(self.tree_colors)
+            return Tile("tree_canopy", color)
+        else:
+            color = random.choice(self.forest_floor_colors)
+            return Tile("forest_floor", color)
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+fields.py
+```
+from engine.world.tile import Tile
+import random
+
+class FieldsBiome:
+    """
+    A simple biome generator for 'fields'.
+    """
+    def __init__(self):
+
+        self.grass_colors = [
+            (50, 150, 50),
+            (70, 170, 70),
+            (90, 190, 90)
+        ]
+
+    def generate_tile(self, global_tile_x, global_tile_y):
+        """
+        Generates a Tile object for the given global tile coordinates within the Fields biome.
+        For now, just random grass color.
+        """
+        color = random.choice(self.grass_colors)
+        return Tile("grass", color)
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+desert.py
+```
+from engine.world.tile import Tile
+import random
+
+class DesertBiome:
+    """
+    A biome generator for desert areas.
+    """
+    def __init__(self):
+        self.desert_colors = [
+            (200, 160, 100),
+            (180, 140, 80),
+            (160, 120, 60)
+        ]
+
+    def generate_tile(self, global_tile_x, global_tile_y):
+        """
+        Generates a Tile object for the given global tile coordinates within the Desert biome.
+        """
+        color = random.choice(self.desert_colors)
+        return Tile("desert_sand", color)
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+coast.py
+```
+from engine.world.tile import Tile
+import random
+
+class CoastBiome:
+    """
+    A biome generator for coastal areas.
+    """
+    def __init__(self):
+        self.sand_colors = [
+            (240, 220, 170),
+            (220, 200, 150),
+            (200, 180, 130)
+        ]
+        self.water_colors = [
+            (50, 150, 200),
+            (40, 130, 180)
+        ]
+
+    def generate_tile(self, global_tile_x, global_tile_y):
+        """
+        Generates a Tile object for the given global tile coordinates within the Coast biome.
+        For demonstration, mixes sand and water tiles based on simple logic (can be replaced by noise).
+        """
+        if (global_tile_x % 5 == 0 or global_tile_y % 5 == 0) and (global_tile_x + global_tile_y) % 2 == 0:
+            color = random.choice(self.water_colors)
+            return Tile("shallow_water", color)
+        else:
+            color = random.choice(self.sand_colors)
+            return Tile("sand", color)
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+display.py
+```
+import pygame
+from typing import Optional
+
+class Display:
+    """
+    Manages the Pygame display window and screen dimensions.
+    """
+    SCREEN_WIDTH = 1280
+    SCREEN_HEIGHT = 1024
+    CAPTION = "Daurat Azaman (Pre-Alpha)"
+
+    TILE_SIZE_METERS = 2
+    TILE_SIZE_PIXELS = 64
+    PIXELS_PER_METER = TILE_SIZE_PIXELS / TILE_SIZE_METERS 
+
+    screen: Optional[pygame.Surface]
+
+    def __init__(self):
+
+        self.screen = None 
+
+        pygame.font.init() 
+        self.font = pygame.font.Font(None, 24)
+        
+        self.initialize() 
+
+    def initialize(self) -> pygame.Surface:
+        """Initializes the Pygame display and sets up the screen."""
+        if self.screen is None:
+            pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
+            pygame.display.set_caption(self.CAPTION)
+            self.screen = pygame.display.get_surface() 
+        return self.screen
+
+    def draw_text(self, text, x, y, color=(255, 255, 255)):
+        """
+        Draws text on the screen.
+        :param text: The string to display.
+        :param x: X-coordinate for the top-left corner of the text.
+        :param y: Y-coordinate for the top-left corner of the text.
+        :param color: RGB tuple for the text color (default white).
+        """
+        text_surface = self.font.render(text, True, color)
+
+        assert self.screen is not None, "Display screen not initialized!"
+        self.screen.blit(text_surface, (x, y))
+
+    def draw_rect_outline(self, surface, color, x, y, width, height, outline_thickness=1):
+        """
+        Draws an outline of a rectangle on the given surface.
+        :param surface: The Pygame surface to draw on.
+        :param color: RGB tuple for the outline color.
+        :param x: X-coordinate for the top-left corner of the rectangle.
+        :param y: Y-coordinate for the top-left corner of the rectangle.
+        :param width: Width of the rectangle.
+        :param height: Height of the rectangle.
+        :param outline_thickness: Thickness of the outline in pixels.
+        """
+        pygame.draw.rect(surface, color, (x, y, width, height), outline_thickness)
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+camera.py
+```
+import pygame
+from engine.display import Display
+
+class Camera:
+    """
+    Manages the screen-by-screen camera movement, like in classic Zelda games.
+    The camera snaps to precise screen coordinates.
+    """
+    def __init__(self, player_ref):
+        self.player = player_ref
+        
+        self.screen_world_x = 0
+        self.screen_world_y = 0
+
+        self._align_to_screen_grid()
+
+    def _align_to_screen_grid(self):
+        """
+        Aligns the camera's screen_world_x/y to the grid based on player's position.
+        This effectively "snaps" the camera to the correct screen.
+        """
+        self.screen_world_x = int(self.player.world_x // Display.SCREEN_WIDTH) * Display.SCREEN_WIDTH
+        self.screen_world_y = int(self.player.world_y // Display.SCREEN_HEIGHT) * Display.SCREEN_HEIGHT
+
+    def update(self):
+        """
+        Checks if the player has crossed a screen threshold and updates the camera position if so.
+        Also adjusts player position relative to the new screen boundaries to prevent them from getting stuck.
+        """
+        if self.player.world_x >= self.screen_world_x + Display.SCREEN_WIDTH:
+            self.screen_world_x += Display.SCREEN_WIDTH
+            self.player.world_x = self.screen_world_x + (self.player.width // 2)
+
+        elif self.player.world_x < self.screen_world_x:
+            self.screen_world_x -= Display.SCREEN_WIDTH
+            self.player.world_x = self.screen_world_x + Display.SCREEN_WIDTH - (self.player.width // 2)
+
+        if self.player.world_y >= self.screen_world_y + Display.SCREEN_HEIGHT:
+            self.screen_world_y += Display.SCREEN_HEIGHT
+            self.player.world_y = self.screen_world_y + (self.player.height // 2)
+
+        elif self.player.world_y < self.screen_world_y:
+            self.screen_world_y -= Display.SCREEN_HEIGHT
+            self.player.world_y = self.screen_world_y + Display.SCREEN_HEIGHT - (self.player.height // 2)
+
+    def get_offset(self):
+        """
+        Returns the top-left world coordinates of the current screen view.
+        This serves as the offset for drawing all world elements.
+        """
+        return self.screen_world_x, self.screen_world_y
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+tile.py
+```
+import pygame
+
+class Tile:
+    def __init__(self, tile_type, color=(0, 255, 0)):
+        self.tile_type = tile_type
+        self.color = color
+
+    def draw(self, surface, x, y, size):
+        """
+        Draws the tile on the given surface at the specified (x, y) pixel coordinates.
+        'size' refers to the pixel dimension of the tile (e.g., Display.TILE_SIZE_PIXELS).
+        """
+        pygame.draw.rect(surface, self.color, (x, y, size, size))
+
+    def __repr__(self):
+        return f"Tile(type='{self.tile_type}', color={self.color})"
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+pixel_map_reader.py
+```
+import pygame
+import os
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
+class PixelMapReader:
+    """
+    Reads the main pixel map (pixel_map.png) to determine biome types and
+    special zone designations for given world coordinates.
+    """
+
+    WORLD_SCALE_METERS_PER_PIXEL = 10
+
+    STATIC_ZONE_COLOR = (255, 0, 0)
+    ROAD_COLOR        = (0, 0, 0)
+    OCEAN_COLOR       = (0, 0, 128)
+    COAST_SAND_COLOR  = (240, 230, 128)
+    FIELDS_COLOR      = (160, 200, 80)
+    FOREST_COLOR      = (34, 139, 34)
+    MOUNTAIN_COLOR    = (0, 100, 0)
+    DESERT_COLOR      = (210, 180, 140)
+    RIVER_COLOR       = (70, 130, 180)
+    SNOW_COLOR        = (248, 248, 255)
+
+    COLOR_MATCH_TOLERANCE = 5
+
+    MAP_FILE_PATH = os.path.join(os.path.dirname(__file__), 'pixel_map.png')
+
+
+    def __init__(self):
+        self.pixel_map_surface = None
+        self._load_pixel_map()
+
+        self.biome_color_map = {
+
+            self.STATIC_ZONE_COLOR: "static_zone",
+
+            self.ROAD_COLOR: "road",
+
+            self.SNOW_COLOR: "snow",
+            self.MOUNTAIN_COLOR: "mountain",
+            self.FOREST_COLOR: "forest",
+            self.FIELDS_COLOR: "fields",
+            self.DESERT_COLOR: "desert",
+            self.COAST_SAND_COLOR: "coast",
+            self.RIVER_COLOR: "river",
+            self.OCEAN_COLOR: "ocean",
+
+        }
+        self.default_biome_name = "ocean"
+
+    def _load_pixel_map(self):
+        """Loads the pixel map image into a Pygame Surface."""
+        if not os.path.exists(self.MAP_FILE_PATH):
+            logging.error(f"Pixel map file not found: {self.MAP_FILE_PATH}")
+            raise FileNotFoundError(f"Required pixel map '{self.MAP_FILE_PATH}' does not exist.")
+        try:
+
+            self.pixel_map_surface = pygame.image.load(self.MAP_FILE_PATH).convert_alpha()
+            logging.info(f"Loaded pixel map: {self.MAP_FILE_PATH} ({self.pixel_map_surface.get_width()}x{self.pixel_map_surface.get_height()} pixels)")
+        except pygame.error as e:
+            logging.error(f"Could not load pixel map: {e}")
+            raise
+
+    def is_color_close(self, color1, color2, tolerance):
+        """
+        Checks if two RGB colors are within a given tolerance for each channel.
+        color1 and color2 are (R, G, B) tuples.
+        """
+
+        diff_r = abs(color1[0] - color2[0])
+        diff_g = abs(color1[1] - color2[1])
+        diff_b = abs(color1[2] - color2[2])
+        return diff_r <= tolerance and diff_g <= tolerance and diff_b <= tolerance
+
+    def get_biome_type(self, world_x_meters, world_y_meters):
+        """
+        Determines the biome or special zone type at the given world coordinates.
+        Applies a planetary wrapping effect for seamless world boundaries.
+
+        Args:
+            world_x_meters (float): The X coordinate in world meters.
+            world_y_meters (float): The Y coordinate in world meters.
+        Returns:
+            str: The name of the biome (e.g., "forest", "ocean", "static_zone", "road").
+        """
+        if self.pixel_map_surface is None:
+            logging.error("Pixel map not loaded. Cannot determine biome type.")
+            return self.default_biome_name
+
+        map_pixel_x = int(world_x_meters / self.WORLD_SCALE_METERS_PER_PIXEL)
+        map_pixel_y = int(world_y_meters / self.WORLD_SCALE_METERS_PER_PIXEL)
+
+        map_width = self.pixel_map_surface.get_width()
+        map_height = self.pixel_map_surface.get_height()
+
+        actual_map_pixel_x = (map_pixel_x % map_width + map_width) % map_width
+
+        cycle_height = 2 * map_height
+        
+        normalized_y = map_pixel_y % cycle_height
+        if normalized_y < 0:
+            normalized_y += cycle_height
+
+        if normalized_y < map_height:
+            actual_map_pixel_y = normalized_y
+        else:
+            actual_map_pixel_y = cycle_height - 1 - normalized_y
+        
+        actual_map_pixel_x = max(0, min(map_width - 1, actual_map_pixel_x))
+        actual_map_pixel_y = max(0, min(map_height - 1, actual_map_pixel_y))
+
+        try:
+
+            pixel_color_rgba = self.pixel_map_surface.get_at((actual_map_pixel_x, actual_map_pixel_y))
+
+            pixel_color_rgb = (pixel_color_rgba[0], pixel_color_rgba[1], pixel_color_rgba[2])
+
+            if self.is_color_close(pixel_color_rgb, self.STATIC_ZONE_COLOR, self.COLOR_MATCH_TOLERANCE):
+                return self.biome_color_map[self.STATIC_ZONE_COLOR]
+
+            if self.is_color_close(pixel_color_rgb, self.ROAD_COLOR, self.COLOR_MATCH_TOLERANCE):
+                return self.biome_color_map[self.ROAD_COLOR]
+
+            for color_rgb, biome_name in self.biome_color_map.items():
+                if color_rgb == self.STATIC_ZONE_COLOR or color_rgb == self.ROAD_COLOR:
+                    continue
+
+                if self.is_color_close(pixel_color_rgb, color_rgb, self.COLOR_MATCH_TOLERANCE):
+                    return biome_name
+
+            logging.warning(f"Unknown pixel color {pixel_color_rgb} at map coordinates ({actual_map_pixel_x}, {actual_map_pixel_y}). Defaulting to '{self.default_biome_name}'.")
+            return self.default_biome_name
+
+        except IndexError:
+            logging.error(f"IndexError accessing pixel map at ({actual_map_pixel_x}, {actual_map_pixel_y}). Defaulting to '{self.default_biome_name}'.")
+            return self.default_biome_name
+        except Exception as e:
+            logging.error(f"An unexpected error occurred while reading pixel map: {e}. Defaulting to '{self.default_biome_name}'.")
+            return self.default_biome_name
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+chunk.py
+```
+import pygame
+from engine.world.tile import Tile
+from engine.display import Display
+
+class Chunk:
+    """
+    Represents a single chunk of the game world, consisting of a grid of tiles.
+    """
+    CHUNK_SIZE_TILES = 16
+
+    def __init__(self, world_x, world_y):
+        """
+        Initializes a chunk.
+        :param world_x: The x-coordinate of the chunk in the world grid (not pixels).
+        :param world_y: The y-coordinate of the chunk in the world grid (not pixels).
+        """
+        self.world_x = world_x
+        self.world_y = world_y
+        self.tiles = [[None for _ in range(self.CHUNK_SIZE_TILES)] for _ in range(self.CHUNK_SIZE_TILES)]
+        self.is_generated = False
+
+    def populate(self, biome_generator_function):
+        """
+        Populates the chunk's tiles using a provided biome generation function.
+        :param biome_generator_function: A function that takes (tile_x, tile_y) and returns a Tile object.
+        """
+        for y in range(self.CHUNK_SIZE_TILES):
+            for x in range(self.CHUNK_SIZE_TILES):
+                global_tile_x = self.world_x * self.CHUNK_SIZE_TILES + x
+                global_tile_y = self.world_y * self.CHUNK_SIZE_TILES + y
+                self.tiles[y][x] = biome_generator_function(global_tile_x, global_tile_y)
+        self.is_generated = True
+
+    def draw(self, surface, camera_offset_x, camera_offset_y):
+        """
+        Draws the chunk's tiles on the given surface, applying a camera offset.
+        :param surface: The Pygame surface to draw on.
+        :param camera_offset_x: The camera's x-offset (in pixels).
+        :param camera_offset_y: The camera's y-offset (in pixels).
+        """
+        chunk_world_pixel_x = self.world_x * self.CHUNK_SIZE_TILES * Display.TILE_SIZE_PIXELS
+        chunk_world_pixel_y = self.world_y * self.CHUNK_SIZE_TILES * Display.TILE_SIZE_PIXELS
+
+        for y in range(self.CHUNK_SIZE_TILES):
+            for x in range(self.CHUNK_SIZE_TILES):
+                tile = self.tiles[y][x]
+                if tile:
+                    tile_pixel_x_in_chunk = x * Display.TILE_SIZE_PIXELS
+                    tile_pixel_y_in_chunk = y * Display.TILE_SIZE_PIXELS
+
+                    screen_x = chunk_world_pixel_x + tile_pixel_x_in_chunk - camera_offset_x
+                    screen_y = chunk_world_pixel_y + tile_pixel_y_in_chunk - camera_offset_y
+
+                    tile.draw(surface, screen_x, screen_y, Display.TILE_SIZE_PIXELS)
+
+```
+
+---------------------------------------------------------------------------------------------------
+
+world/__init__.py
+```
+from .chunk import Chunk
+from .tile import Tile
+
+from . import indoor
+from . import outdoor
+from . import world_logic
+
+from .chunk import Chunk
+from .tile import Tile
+
+from .indoor import *
+from .outdoor import *
+from .world_logic import *
+```
